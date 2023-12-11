@@ -14,8 +14,22 @@ from . import (DictReaderStrip, get_account_by_guess,
 from .base import Base
 from .deduplicate import Deduplicate
 
-Account支付宝 = 'Assets:Company:Alipay:StupidAlipay'
+Account支付宝 = 'Assets:Alipay'
 
+account_map = {
+    "招商":"Assets:Bank:CMB:3007"
+}
+
+account_map_res = dict([(key, re.compile(key)) for key in account_map])
+
+
+def get_account_by_map(description):
+    if description != '':
+        for key, value in account_map.items():
+            if account_map_res[key].findall(description):
+                return value
+    
+    return Account支付宝
 
 class Alipay(Base):
 
@@ -27,11 +41,19 @@ class Alipay(Base):
                 byte_content = z.read(filelist[0])
         content = byte_content.decode('gbk')
         lines = content.split("\n")
-        if (lines[0] != '支付宝交易记录明细查询\r'):
-            raise RuntimeError('Not Alipay Trade Record!')
-        print('Import Alipay: ' + lines[2])
-        content = "\n".join(lines[4:len(lines) - 8])
+
+        # 去除注释行，无效行
+        start_lines = 0
+        for line in lines:
+            if line.startswith("交易时间"):
+                break
+            start_lines += 1
+
+        print('Import Alipay: ' + lines[3])
+        content = "\n".join(lines[start_lines:])
         self.content = content
+
+        # 去重复
         self.deduplicate = Deduplicate(entries, option_map)
 
     def parse(self):
@@ -40,76 +62,72 @@ class Alipay(Base):
         reader = DictReaderStrip(f, delimiter=',')
         transactions = []
         for row in reader:
-            if row['交易状态'] == '交易关闭' and row['资金状态'] == '':
+            if row['交易状态'] in ('交易关闭','冻结成功','不计收支'):
                 continue
-            if row['交易状态'] == '冻结成功':
-                continue
-            time = row['付款时间']
-            if time == '':
-                time = row['交易创建时间']
-            print("Importing {} at {}".format(row['商品名称'], time))
+ 
+            # 准备元数据
+            time = row['交易时间']
+            # print("Importing {} at {}".format(row['商品说明'], time))
+            
             meta = {}
             time = dateparser.parse(time)
-            meta['alipay_trade_no'] = row['交易号']
+            meta['alipay_trade_no'] = row['交易订单号']
             meta['trade_time'] = str(time)
             meta['timestamp'] = str(time.timestamp()).replace('.0', '')
-            account = get_account_by_guess(row['交易对方'], row['商品名称'], time)
-            flag = "*"
-            amount = float(row['金额（元）'])
-            if account == "Expenses:Unknown":
-                flag = "!"
-
-            if row['备注'] != '':
-                meta['note'] = row['备注']
 
             if row['商家订单号'] != '':
                 meta['shop_trade_no'] = row['商家订单号']
+
+            description = f"{row['交易分类']},{row['交易对方']},{row['商品说明']},{row['备注']}"
+            meta['note'] = description
 
             meta = data.new_metadata(
                 'beancount/core/testing.beancount',
                 12345,
                 meta
             )
+
+            
+            # 构造交易
             entry = Transaction(
-                meta,
-                date(time.year, time.month, time.day),
-                flag,
-                row['交易对方'],
-                row['商品名称'],
-                data.EMPTY_SET,
-                data.EMPTY_SET, []
-            )
-            price = row['金额（元）']
-            money_status = row['资金状态']
-            if money_status == '已支出':
-                data.create_simple_posting(entry, Account支付宝, None, None)
-                amount = -amount
-            elif money_status == '资金转移':
-                data.create_simple_posting(entry, Account支付宝, None, None)
-            elif money_status == '已收入':
-                if row['交易状态'] == '退款成功':
-                    # 收钱码收款时，退款成功时资金状态为已支出
-                    price = '-' + price
-                    data.create_simple_posting(entry, Account支付宝, None, None)
-                else:
-                    income = get_income_account_by_guess(
-                        row['交易对方'], row['商品名称'], time)
-                    if income == 'Income:Unknown':
-                        entry = entry._replace(flag='!')
-                    data.create_simple_posting(entry, income, None, None)
-                    if flag == "!":
-                        account = Account支付宝
+                    meta,
+                    date(time.year, time.month, time.day),
+                    "*",
+                    row['交易对方'],
+                    description,
+                    data.EMPTY_SET,
+                    data.EMPTY_SET, []
+                )
+
+
+            account2 = get_account_by_map(row['收/付款方式'])
+
+            #支出
+            if row['收/支'] in ('支出'):
+                account = get_account_by_guess(row['交易对方'], description, time)
+                if account == "Expenses:Unknown":
+                    entry = entry._replace(flag='!')
+
+                price = row['金额']
+                data.create_simple_posting(entry, account, price, 'CNY')
+                data.create_simple_posting(entry, account2, None,None)
+
+            #收入
+            elif row['收/支'] in ('收入'):
+                income = get_income_account_by_guess(row['交易对方'], description, time)
+                if income == 'Income:Unknown':
+                    entry = entry._replace(flag='!')
+
+                price = row['金额']
+                data.create_simple_posting(entry, account2, price,'CNY')
+                data.create_simple_posting(entry, income, None, None)
+
             else:
-                print('Unknown status')
-                print(row)
+                print("非收入/支出")
+                pass
 
-            data.create_simple_posting(entry, account, price, 'CNY')
-            if (row['服务费（元）'] != '0.00'):
-                data.create_simple_posting(
-                    entry, 'Expenses:Finance:Fee', row['服务费（元）'], 'CNY')
-
-            #b = printer.format_entry(entry)
-            # print(b)
+            #去重
+            amount = float(row['金额'])
             if not self.deduplicate.find_duplicate(entry, amount, 'alipay_trade_no'):
                 transactions.append(entry)
 

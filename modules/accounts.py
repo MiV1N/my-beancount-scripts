@@ -1,6 +1,6 @@
 import re
 
-import dateparser
+# import dateparser
 
 
 def get_eating_account(from_user, description, time=None):
@@ -40,17 +40,14 @@ accounts = {
 }
 
 descriptions = {
-    #'滴滴打车|滴滴快车': get_didi,
-    '余额宝.*收益发放': 'Assets:Company:Alipay:MonetaryFund',
-    '转入到余利宝': 'Assets:Bank:MyBank',
-    '花呗收钱服务费': 'Expenses:Fee',
-    '自动还款-花呗.*账单': 'Liabilities:Company:Huabei',
-    '信用卡自动还款|信用卡还款': get_credit_return,
-    '外卖订单': get_eating_account,
-    '美团订单': get_eating_account,
-    '上海交通卡发行及充值': 'Expenses:Transport:Card',
-    '地铁出行': 'Expenses:Transport:City',
-    '火车票': 'Expenses:Travel:Transport',
+    '亲情卡': 'Expenses:Miscellaneous:Transfer:Heyao',
+    '(城市通卡|交通出行|渡口)': 'Expenses:Transportation:PublicTransportation',
+    '爱车养车': 'Expenses:Transportation:Car',
+    '话费充值': 'Expenses:Electronics:PhoneBills',
+    '餐饮美食': 'Expenses:Food',
+    '日用百货|纯水机': 'Expenses:Household',
+    "CLOUDCONE":'Expenses:Electronics:Vps',
+    'HOTEL|酒店':'Expenses:Housing:Rent'
 }
 
 anothers = {

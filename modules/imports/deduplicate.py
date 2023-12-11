@@ -29,10 +29,7 @@ class Deduplicate:
                 if unique_no in entry.meta and unique_no in item.metas:
                     if item.metas[unique_no] == entry.meta[unique_no]:
                         same_trade = True
-                    # unique_no存在但不同，那就绝对不是同一笔交易了
-                    # 这个时候就直接返回不存在同订单
-                    else:
-                        return False
+
             if same_trade:
                 return True
             # 否则，可能是不同账单的同交易，此时判断时间
