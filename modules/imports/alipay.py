@@ -14,7 +14,7 @@ from . import (DictReaderStrip, get_account_by_guess,
 from .base import Base
 from .deduplicate import Deduplicate
 
-Account支付宝 = 'Assets:Alipay'
+Account支付宝 = 'Assets:MobilePayment:Alipay'
 
 account_map = {
     "招商":"Assets:Bank:CMB:3007"

@@ -15,7 +15,7 @@ from .base import Base
 from .deduplicate import Deduplicate
 import logging
 
-Account_WeChat = 'Assets:WeChat'
+Account_WeChat = 'Assets:MobilePayment:WeChat'
 
 account_map = {
     "招商银行(3007)":"Assets:Bank:CMB:3007"
