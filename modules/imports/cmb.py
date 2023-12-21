@@ -15,10 +15,10 @@ from .base import Base
 from .deduplicate import Deduplicate
 import logging
 
-Account_WeChat = 'Assets:WeChat'
+Account招商 = 'Assets:Bank:CMB:3007'
 
 account_map = {
-    "招商银行(3007)":"Assets:Bank:CMB:3007"
+    "招商":"Assets:Bank:CMB:3007"
 }
 
 account_map_res = dict([(key, re.compile(key)) for key in account_map])
@@ -29,13 +29,14 @@ def get_account_by_map(description):
             if account_map_res[key].findall(description):
                 return value
     
-    return Account_WeChat
+    return Account招商
 
 # 需要跳过的交易
 
-# 对于线上交易，跳过退款的支出和收入部分
+# 对于支付宝等线上交易，通过支付宝，微信拉取交易信息
 skip_transaction_map = [
-    "退款"
+    "(网联|银联在线支付|银联快捷支付)",  #支付宝支付，退款使用的网联/银联快捷支付，拼多多使用的银联在线支付
+    "冲补账处理"            #拼多多退款使用的冲补账处理
 ]
 
 skip_transaction_res = [re.compile(key) for key in skip_transaction_map]
@@ -49,11 +50,11 @@ def skip_transaction(amount_type):
     
     return False
 
-class WeChat(Base):
+class CMB(Base):
 
     def __init__(self, filename, byte_content, entries, option_map):
-        if not re.search(r'微信支付账单.*\.csv$', filename.name):
-            raise Exception("not WeChat ,skip")
+        if not re.search(r'CMB.*\.csv$', filename.name):
+            raise Exception("not 招商 ,skip")
      
         content = byte_content.decode('utf-8')
         lines = content.split("\n")
@@ -62,14 +63,14 @@ class WeChat(Base):
         start_lines = 0
         end_lines = 0
         for idx,line in enumerate(lines):
-            if line.startswith("交易时间"):
+            if line.startswith("交易日期"):
                 start_lines = idx
             
-            if line != '':
+            if (not line.startswith("#")) and (line != ''):
                 end_lines = idx
             
 
-        print('Import WeChat: ' + lines[1])
+        print('Import CMB: ' + lines[0])
         content = "\n".join(lines[start_lines:end_lines])
         self.content = content
 
@@ -80,40 +81,39 @@ class WeChat(Base):
         content = self.content
         f = StringIO(content)
         reader = DictReaderStrip(f, delimiter=',')
-        # 交易时间,交易类型,交易对方,商品,收/支,金额(元),支付方式,当前状态,交易单号,商户单号,备注
-        # 2023-12-03 17:39:16,商户消费,龙头寺茶园,"74107437-1币-ID30101016",支出,¥1.00,零钱,支付成功,4200001997202312038921813515	,9001034128723337	,"/"
+        # 交易日期,交易时间,收入,支出,余额,交易类型,交易备注
+        # "	20231203","	12:56:16","","64.91","221455.46","	银联在线支付","	银联在线支付，（特约）拼多多"
+        
         
         transactions = []
         for row in reader:
 
-            amount_status = row["当前状态"]
-            if skip_transaction(amount_status):
-                # 跳过数据
+            amount_type = row['交易类型'].strip("\t")
+            # 跳过数据
+            if skip_transaction(amount_type):
                 print("skip")
-                continue
 
+                continue
 
             # 准备元数据
 
-            amount_time = row['交易时间']
-            amount_datetime = datetime.strptime(amount_time,"%Y-%m-%d %H:%M:%S")
+            amount_date = row['交易日期'].strip("\t")
+            amount_time = row['交易时间'].strip("\t")
+            amount_datetime = datetime.strptime(f"{amount_date} {amount_time}","%Y%m%d %H:%M:%S")
 
             meta = {}
             meta['trade_time'] = str(amount_datetime)
             meta['timestamp'] = str(amount_datetime.timestamp()).replace('.0', '')
 
-            meta['shop_trade_no']  = row["商户单号"].strip("\t")
-            meta['wechat_trade_no'] = row["交易单号"].strip("\t")
+            # meta['shop_trade_no']  #无
+            # meta['alipay_trade_no'] #无
 
             
-            amount_type = row['交易类型']
-            counterparty = row['交易对方']
-            goods = row["商品"]
-            amount_note = row['备注']
-            description = f"{amount_type},{counterparty},{goods},{amount_note}"
+            amount_note = row['交易备注'].strip("\t")
+            description = f"{amount_type},{amount_note}"
             meta['note'] = description
 
-            # print(description)
+            print(description)
 
 
             meta = data.new_metadata(
@@ -127,44 +127,41 @@ class WeChat(Base):
                     meta,
                     date(amount_datetime.year, amount_datetime.month, amount_datetime.day),
                     "*",
-                    row['交易对方'],
+                    "", #无交易对方
                     description,
                     data.EMPTY_SET,
                     data.EMPTY_SET, []
                 )
 
             # 银行账户，支出/收入都会是银行的账户
-            account2 = get_account_by_map(row['支付方式'])
-            price = row['金额(元)'].strip("¥")
+            account2 = Account招商
 
+            amount_out  = True if row["支出"] != "" else False
+            price = row['支出'] if amount_out else row['收入']
             #支出
-            if row['收/支'] in ('支出'):
-                account = get_account_by_guess(counterparty, description, amount_datetime)
+            if amount_out:
+                # 靠支付宝获取其他信息
+                account = get_account_by_guess('', description, amount_datetime)
                 if account == "Expenses:Unknown":
                     entry = entry._replace(flag='!')
 
-                # 金额为正，写入到支出的账户中
-                data.create_simple_posting(entry, account, price, 'CNY')
+                # 支出，金额写到Expenses账户
                 data.create_simple_posting(entry, account2, f"-{price}",'CNY')
+                data.create_simple_posting(entry, account, price, 'CNY')
 
             #收入
-            elif row['收/支'] in ('收入'):
-                income = get_income_account_by_guess(counterparty, description, amount_datetime)
+            else:
+                income = get_income_account_by_guess('', description, amount_datetime)
                 if income == 'Income:Unknown':
                     entry = entry._replace(flag='!')
 
-                # 金额为正，写入到微信的账户中
-                data.create_simple_posting(entry, account2, price,'CNY')
+                # 收入，金额写到收入账户
                 data.create_simple_posting(entry, income, f"-{price}", 'CNY')
+                data.create_simple_posting(entry, account2, price,'CNY')
 
-            else:
-                print("非收入/支出")
-                pass
-
-           
             #去重
             amount = float(price)
-            if not self.deduplicate.find_duplicate(entry, amount,"wechat_trade_no"):
+            if not self.deduplicate.find_duplicate(entry, amount):
                 transactions.append(entry)
 
         # self.deduplicate.apply_beans()

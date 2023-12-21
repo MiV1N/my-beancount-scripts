@@ -13,6 +13,10 @@ class Deduplicate:
         self.beans = {}
 
     def find_duplicate(self, entry, money, unique_no=None, replace_account='', currency='CNY'):
+        
+        if self.entries == None or entry == None:
+            return False
+        
         # 要查询的是实际付款的账户，而不是支出信息
         bql = "SELECT flag, filename, lineno, location, account, year, month, day, str(entry_meta('timestamp')) as timestamp, metas() as metas WHERE year = {} AND month = {} AND day = {} AND number(convert(units(position), '{}')) = {} ORDER BY timestamp ASC".format(
             entry.date.year, entry.date.month, entry.date.day, currency, money)
@@ -35,7 +39,7 @@ class Deduplicate:
             # 否则，可能是不同账单的同交易，此时判断时间
             # 如果时间戳相同，或某个导入器的数据没有时间戳，则判断其为「还需进一步处理」的同笔交易
             # 例如，手工输入的交易，打上支付宝订单号。
-            # 另外因为支付宝的傻逼账单，这里还需要承担支付手段更新的功能
+
             if (
                 (not 'timestamp' in entry.meta) or
                 item_timestamp == entry.meta['timestamp'] or
@@ -43,19 +47,25 @@ class Deduplicate:
                 item.timestamp == ''
             ):
                 updated_items.append(item)
-                if replace_account != '' and item.account in public_accounts:
-                    self.update_transaction_account(
-                        item.location, item.account, replace_account)
+                # if replace_account != '' and item.account in public_accounts:
+                #     self.update_transaction_account(
+                #         item.location, item.account, replace_account)
+
+                # 自定义meta不齐，这里补全信息
                 for key, value in entry.meta.items():
                     if key == 'filename' or key == 'lineno':
                         continue
                     if not key in item.metas:
-                        self.append_text_to_transaction(
-                            item.filename, item.lineno, '{}: "{}"'.format(key, value))
+                        item.metas[key] = value
+                    elif value != item.metas[key]:
+                        item.metas[key] += value
+                        # self.append_text_to_transaction(
+                        #     item.filename, item.lineno, '{}: "{}"'.format(key, value))
                 # 如果有时间戳，且时间戳相同，则判定为同交易
                 # 100%确认是同一笔交易后，就没必要再给其他的「金额相同」的交易加信息了
                 if 'timestamp' in entry.meta and item_timestamp == entry.meta['timestamp']:
                     break
+                
         if len(updated_items) > 1:
             for item in updated_items:
                 self.update_transaction_flag(item.location, item.flag, '!')

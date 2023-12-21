@@ -34,11 +34,10 @@ def get_account_by_map(description):
 class Alipay(Base):
 
     def __init__(self, filename, byte_content, entries, option_map):
-        if re.search(r'alipay_record_.*\.zip$', filename):
-            z = ZipFile(BytesIO(byte_content), 'r')
-            filelist = z.namelist()
-            if len(filelist) == 1 and re.search(r'alipay_record.*\.csv$', filelist[0]):
-                byte_content = z.read(filelist[0])
+
+        if not re.search(r'alipay_record_.*\.csv$', filename.name):
+            raise Exception("not alipay ,skip")
+
         content = byte_content.decode('gbk')
         lines = content.split("\n")
 
@@ -61,8 +60,10 @@ class Alipay(Base):
         f = StringIO(content)
         reader = DictReaderStrip(f, delimiter=',')
         transactions = []
+        
         for row in reader:
-            if row['交易状态'] in ('交易关闭','冻结成功','不计收支'):
+            if (row['交易状态'] in ('交易关闭','冻结成功')) or \
+               (row['收/支'] in ('不计收支') ) :
                 continue
  
             # 准备元数据
@@ -109,8 +110,10 @@ class Alipay(Base):
                     entry = entry._replace(flag='!')
 
                 price = row['金额']
+
+                # 金额为正，写入到支出的账户中
                 data.create_simple_posting(entry, account, price, 'CNY')
-                data.create_simple_posting(entry, account2, None,None)
+                data.create_simple_posting(entry, account2, f"-{price}",'CNY')
 
             #收入
             elif row['收/支'] in ('收入'):
@@ -119,8 +122,9 @@ class Alipay(Base):
                     entry = entry._replace(flag='!')
 
                 price = row['金额']
+                # 金额为正，写入到支付宝的账户中
                 data.create_simple_posting(entry, account2, price,'CNY')
-                data.create_simple_posting(entry, income, None, None)
+                data.create_simple_posting(entry, income, f"-{price}", 'CNY')
 
             else:
                 print("非收入/支出")
@@ -131,5 +135,5 @@ class Alipay(Base):
             if not self.deduplicate.find_duplicate(entry, amount, 'alipay_trade_no'):
                 transactions.append(entry)
 
-        self.deduplicate.apply_beans()
+        # self.deduplicate.apply_beans()
         return transactions

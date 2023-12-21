@@ -2,21 +2,23 @@ import argparse
 import re
 from datetime import date
 
+from pathlib import Path
 from beancount import loader
 from beancount.core import data
 from beancount.parser import parser, printer
 
 from modules.imports.alipay import Alipay
-from modules.imports.abc_credit import ABCCredit
-from modules.imports.ccb_credit import CCBCredit
-from modules.imports.citic_credit import CITICCredit
-from modules.imports.cmb_credit import CMBCredit
-from modules.imports.cmbc_credit import CMBCCredit
-from modules.imports.icbc_credit import ICBCCredit
-from modules.imports.icbc_debit import ICBCDebit
+from modules.imports.cmb import CMB
+# from modules.imports.abc_credit import ABCCredit
+# from modules.imports.ccb_credit import CCBCredit
+# from modules.imports.citic_credit import CITICCredit
+# from modules.imports.cmb_credit import CMBCredit
+# from modules.imports.cmbc_credit import CMBCCredit
+# from modules.imports.icbc_credit import ICBCCredit
+# from modules.imports.icbc_debit import ICBCDebit
 from modules.imports.wechat import WeChat
-from modules.imports.yuebao import YuEBao
-from modules.imports.alipay_prove import AlipayProve
+# from modules.imports.yuebao import YuEBao
+# from modules.imports.alipay_prove import AlipayProve
 
 parser = argparse.ArgumentParser("import")
 parser.add_argument("path", help="CSV Path")
@@ -25,27 +27,41 @@ parser.add_argument(
 parser.add_argument("--out", help="Output bean path", default='out.bean')
 args = parser.parse_args()
 
-entries, errors, option_map = loader.load_file(args.entry)
+entries, errors, option_map = loader.load_file(args.entry)  #手动记录部分
 
-importers = [Alipay, AlipayProve, YuEBao, WeChat,
-             ABCCredit, CCBCredit, CITICCredit, CMBCCredit, CMBCredit, ICBCCredit,
-             ICBCDebit]
-instance = None
-for importer in importers:
-    try:
-        with open(args.path, 'rb') as f:
-            file_bytes = f.read()
-            instance = importer(args.path, file_bytes, entries, option_map)
-        break
-    except Exception as e:
-        print(e)
-        pass
+# importers = [Alipay, AlipayProve, YuEBao, WeChat,
+#              ABCCredit, CCBCredit, CITICCredit, CMBCCredit, CMBCredit, ICBCCredit,
+#              ICBCDebit]
+importers = [Alipay,CMB,WeChat]
 
-if instance == None:
-    print("No suitable importer!")
-    exit(1)
 
-new_entries = instance.parse()
+all_path = Path(args.path)
+files = all_path.glob("*.csv")
+
+new_entries = entries if len(entries)>0 else []
+
+# 文件解析
+for file in files:
+    instance = None
+    for importer in importers:
+        try:
+            with open(file, 'rb') as f:
+                file_bytes = f.read()
+                instance = importer(file, file_bytes, new_entries, option_map)
+            
+            _entries = instance.parse()
+            new_entries.extend(_entries)
+
+            break
+        except Exception as e:
+            print(e)
+            pass
+
+    # if instance == None:
+    #     print("No suitable importer!")
+    #     exit(1)
+
+    # new_entries = instance.parse()
 
 
 with open(args.out, 'w', encoding='utf-8') as f:
