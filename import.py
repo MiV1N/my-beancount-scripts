@@ -1,6 +1,6 @@
 import argparse
 import re
-from datetime import date
+from datetime import datetime
 
 from pathlib import Path
 from beancount import loader
@@ -24,7 +24,7 @@ parser = argparse.ArgumentParser("import")
 parser.add_argument("path", help="CSV Path")
 parser.add_argument(
     "--entry", help="Entry bean path (default = main.bean)", default='main.bean')
-parser.add_argument("--out", help="Output bean path", default='out.bean')
+parser.add_argument("--out", help="Output bean path", default='')
 args = parser.parse_args()
 
 entries, errors, option_map = loader.load_file(args.entry)  #手动记录部分
@@ -36,12 +36,13 @@ importers = [Alipay,CMB,WeChat]
 
 
 all_path = Path(args.path)
-files = all_path.glob("*.csv")
+files = all_path.rglob("*.csv")
 
 new_entries = entries if len(entries)>0 else []
 
 # 文件解析
 for file in files:
+    print(f"处理文件：{file.name}")
     instance = None
     for importer in importers:
         try:
@@ -63,11 +64,15 @@ for file in files:
 
     # new_entries = instance.parse()
 
+save_name = args.out
+if save_name == "":
+    now = datetime.now()
+    save_name = f'{all_path.absolute()}/{now.strftime("%Y%m%d")}.bean'
 
-with open(args.out, 'w', encoding='utf-8') as f:
+with open(save_name, 'w', encoding='utf-8') as f:
     printer.print_entries(new_entries, file=f)
 
-print('Outputed to ' + args.out)
+print('Outputed to ' + save_name)
 exit(0)
 
 file = parser.parse_one('''

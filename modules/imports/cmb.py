@@ -113,9 +113,6 @@ class CMB(Base):
             description = f"{amount_type},{amount_note}"
             meta['note'] = description
 
-            print(description)
-
-
             meta = data.new_metadata(
                 'beancount/core/testing.beancount',
                 12345,
