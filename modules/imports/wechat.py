@@ -89,7 +89,6 @@ class WeChat(Base):
             amount_status = row["当前状态"]
             if skip_transaction(amount_status):
                 # 跳过数据
-                print("skip")
                 continue
 
 

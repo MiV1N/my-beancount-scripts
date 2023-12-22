@@ -91,8 +91,6 @@ class CMB(Base):
             amount_type = row['交易类型'].strip("\t")
             # 跳过数据
             if skip_transaction(amount_type):
-                print("skip")
-
                 continue
 
             # 准备元数据
