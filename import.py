@@ -17,6 +17,10 @@ from modules.imports.cmb import CMB
 # from modules.imports.icbc_credit import ICBCCredit
 # from modules.imports.icbc_debit import ICBCDebit
 from modules.imports.wechat import WeChat
+import logging
+
+logging.basicConfig(level=logging.ERROR)
+
 # from modules.imports.yuebao import YuEBao
 # from modules.imports.alipay_prove import AlipayProve
 
@@ -42,7 +46,7 @@ new_entries = entries if len(entries)>0 else []
 
 # 文件解析
 for file in files:
-    print(f"处理文件：{file.name}")
+    logging.debug(f"处理文件：{file.name}")
     instance = None
     for importer in importers:
         try:
@@ -55,14 +59,8 @@ for file in files:
 
             break
         except Exception as e:
-            print(e)
+            logging.debug(e)
             pass
-
-    # if instance == None:
-    #     print("No suitable importer!")
-    #     exit(1)
-
-    # new_entries = instance.parse()
 
 save_name = args.out
 if save_name == "":

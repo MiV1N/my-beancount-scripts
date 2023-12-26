@@ -64,9 +64,11 @@ class Deduplicate:
                         # self.append_text_to_transaction(
                         #     item.filename, item.lineno, '{}: "{}"'.format(key, value))
             
-            # 如果有时间戳，且时间戳相同，则判定为同交易
+            # 如果有时间戳，且时间戳在误差范围，则判定为同交易
             # 100%确认是同一笔交易后，将当前的describe信息添加到之前的交易中
-            if 'timestamp' in entry.meta and item_timestamp == entry.meta['timestamp']:
+            time_gap = abs(int(item_timestamp) - int(entry.meta['timestamp'])) # 单位:秒
+            tolerance = 10 #容差为10s
+            if 'timestamp' in entry.meta and time_gap <= tolerance:
                 
                 for idx,transaction in enumerate(self.entries):
                     if item_timestamp == transaction.meta['timestamp']:
@@ -82,10 +84,16 @@ class Deduplicate:
                         # posting补全
                         unknown_posts = [ post for post in transaction.postings if "Unknown" in post.account]
                         if len(unknown_posts) > 0:
-                            transaction.postings = entry.postings
+                            all_posting = []
+                            all_posting.extend(transaction.postings)
+                            all_posting.extend(entry.postings)
+                            new_postings = self.postings_merge(all_posting)
+                            transaction.postings.clear() 
+                            transaction.postings.extend(new_postings) 
 
-                        # 补全描述信息
-                        new_transaction = transaction._replace(narration=transaction.narration + entry.narration)
+                        # 补全描述信息 和 flag
+                        flag = "*" if ("*" == transaction.flag) or ("*" == transaction.flag) else "!"
+                        new_transaction = transaction._replace(narration=transaction.narration + entry.narration,flag=flag)
                         del self.entries[idx] #不会再往后迭代了，这里删除是安全的
                         self.entries.append(new_transaction)
                         same_trade = True
@@ -96,6 +104,54 @@ class Deduplicate:
         #     for item in updated_items:
         #         self.update_transaction_flag(item.location, item.flag, '!')
         return same_trade
+
+    def postings_filte(self,postings:list):
+        new_posting = postings[0] #合并为一个
+        number = postings[0].units.number
+
+        is_new_posting_ok = False
+        if ("Unknown" not in new_posting.account) and \
+            ("Transfer:Heyao" not in new_posting.account):
+            is_new_posting_ok = True
+
+        tmp_post = None
+        for post in postings[1:]:
+
+            # 前面的bql 条件为金额相同，这里不会存在金额不同的金额
+            # if number != post.units.number:
+            #     print("！！！同一个交易的金额不匹配")
+
+            if 'Unknown' not in post.account:
+                if "Transfer:Heyao"  in post.account:
+                    tmp_post = post
+                else:
+                    if not is_new_posting_ok:
+                        is_new_posting_ok = True
+                        tmp_post = None
+                        new_posting = post
+
+                    else: #多个非Unknown的情况
+                        if new_posting.units.number != post.units.number:
+                            print("!!!相同交易的金额不同")
+                        if new_posting.account != post.account:
+                            print("!!!相同交易的账户不同")
+
+        #  优先使用亲情付账户，其次是随便取一个
+        if not is_new_posting_ok: 
+            new_posting = tmp_post if tmp_post != None else new_posting
+
+        return new_posting
+
+    def postings_merge(self,postings:list):
+
+        post_out = [post for post in postings if post.units.number < 0]
+        post_in = [post for post in postings if post.units.number >= 0]
+
+        new_post  = [self.postings_filte(post_out)]
+        new_post.append(self.postings_filte(post_in))
+
+        return  new_post
+        
 
     def read_bean(self, filename):
         if filename in self.beans:

@@ -14,11 +14,12 @@ from . import (DictReaderStrip, get_account_by_guess,
 from .base import Base
 from .deduplicate import Deduplicate
 import logging
+from tqdm import tqdm
 
 Account_WeChat = 'Assets:MobilePayment:WeChat'
 
 account_map = {
-    "招商银行(3007)":"Assets:Bank:CMB:3007"
+    "招商银行\(3007\)":"Assets:Bank:CMB:3007"
 }
 
 account_map_res = dict([(key, re.compile(key)) for key in account_map])
@@ -67,11 +68,13 @@ class WeChat(Base):
             
             if line != '':
                 end_lines = idx
-            
 
-        print('Import WeChat: ' + lines[1])
-        content = "\n".join(lines[start_lines:end_lines])
+
+        # print('Import WeChat: ' + lines[1])
+        content = "\n".join(lines[start_lines:end_lines + 1])
         self.content = content
+        self.filename = filename.name
+        self.line_num = end_lines - start_lines  #不再加1是为了排除标题行
 
         # 去重复
         self.deduplicate = Deduplicate(entries, option_map)
@@ -82,89 +85,92 @@ class WeChat(Base):
         reader = DictReaderStrip(f, delimiter=',')
         # 交易时间,交易类型,交易对方,商品,收/支,金额(元),支付方式,当前状态,交易单号,商户单号,备注
         # 2023-12-03 17:39:16,商户消费,龙头寺茶园,"74107437-1币-ID30101016",支出,¥1.00,零钱,支付成功,4200001997202312038921813515	,9001034128723337	,"/"
-        
-        transactions = []
-        for row in reader:
-
-            amount_status = row["当前状态"]
-            if skip_transaction(amount_status):
-                # 跳过数据
-                continue
-
-
-            # 准备元数据
-
-            amount_time = row['交易时间']
-            amount_datetime = datetime.strptime(amount_time,"%Y-%m-%d %H:%M:%S")
-
-            meta = {}
-            meta['trade_time'] = str(amount_datetime)
-            meta['timestamp'] = str(amount_datetime.timestamp()).replace('.0', '')
-
-            meta['shop_trade_no']  = row["商户单号"].strip("\t")
-            meta['wechat_trade_no'] = row["交易单号"].strip("\t")
-
+         #进度展示
+        with tqdm(total=self.line_num) as pbar:
+            pbar.set_description(f'{self.filename}:')
             
-            amount_type = row['交易类型']
-            counterparty = row['交易对方']
-            goods = row["商品"]
-            amount_note = row['备注']
-            description = f"{amount_type},{counterparty},{goods},{amount_note}"
-            meta['note'] = description
+            transactions = []
+            for row in reader:
 
-            # print(description)
+                amount_status = row["当前状态"]
+                if skip_transaction(amount_status):
+                    # 跳过数据
+                    pbar.update(1)
+                    continue
+
+                # 准备元数据
+
+                amount_time = row['交易时间']
+                amount_datetime = datetime.strptime(amount_time,"%Y-%m-%d %H:%M:%S")
+
+                meta = {}
+                meta['trade_time'] = str(amount_datetime)
+                meta['timestamp'] = str(amount_datetime.timestamp()).replace('.0', '')
+
+                meta['shop_trade_no']  = row["商户单号"].strip("\t")
+                meta['wechat_trade_no'] = row["交易单号"].strip("\t")
+
+                
+                amount_type = row['交易类型']
+                counterparty = row['交易对方']
+                goods = row["商品"]
+                amount_note = row['备注']
+                description = f"{amount_type},{counterparty},{goods},{amount_note}"
+                meta['note'] = description
+
+                # print(description)
 
 
-            meta = data.new_metadata(
-                'beancount/core/testing.beancount',
-                12345,
-                meta
-            )
-            
-            # 构造交易
-            entry = Transaction(
-                    meta,
-                    date(amount_datetime.year, amount_datetime.month, amount_datetime.day),
-                    "*",
-                    row['交易对方'],
-                    description,
-                    data.EMPTY_SET,
-                    data.EMPTY_SET, []
+                meta = data.new_metadata(
+                    'beancount/core/testing.beancount',
+                    12345,
+                    meta
                 )
+                
+                # 构造交易
+                entry = Transaction(
+                        meta,
+                        date(amount_datetime.year, amount_datetime.month, amount_datetime.day),
+                        "*",
+                        row['交易对方'],
+                        description,
+                        data.EMPTY_SET,
+                        data.EMPTY_SET, []
+                    )
 
-            # 银行账户，支出/收入都会是银行的账户
-            account2 = get_account_by_map(row['支付方式'])
-            price = row['金额(元)'].strip("¥")
+                # 银行账户，支出/收入都会是银行的账户
+                account2 = get_account_by_map(row['支付方式'])
+                price = row['金额(元)'].strip("¥")
 
-            #支出
-            if row['收/支'] in ('支出'):
-                account = get_account_by_guess(counterparty, description, amount_datetime)
-                if account == "Expenses:Unknown":
-                    entry = entry._replace(flag='!')
+                #支出
+                if row['收/支'] in ('支出'):
+                    account = get_account_by_guess(counterparty, description, amount_datetime)
+                    if account == "Expenses:Unknown":
+                        entry = entry._replace(flag='!')
 
-                # 金额为正，写入到支出的账户中
-                data.create_simple_posting(entry, account, price, 'CNY')
-                data.create_simple_posting(entry, account2, f"-{price}",'CNY')
+                    # 金额为正，写入到支出的账户中
+                    data.create_simple_posting(entry, account, price, 'CNY')
+                    data.create_simple_posting(entry, account2, f"-{price}",'CNY')
 
-            #收入
-            elif row['收/支'] in ('收入'):
-                income = get_income_account_by_guess(counterparty, description, amount_datetime)
-                if income == 'Income:Unknown':
-                    entry = entry._replace(flag='!')
+                #收入
+                elif row['收/支'] in ('收入'):
+                    income = get_income_account_by_guess(counterparty, description, amount_datetime)
+                    if income == 'Income:Unknown':
+                        entry = entry._replace(flag='!')
 
-                # 金额为正，写入到微信的账户中
-                data.create_simple_posting(entry, account2, price,'CNY')
-                data.create_simple_posting(entry, income, f"-{price}", 'CNY')
+                    # 金额为正，写入到微信的账户中
+                    data.create_simple_posting(entry, account2, price,'CNY')
+                    data.create_simple_posting(entry, income, f"-{price}", 'CNY')
 
-            else:
-                print("非收入/支出")
-                pass
+                else:
+                    print("非收入/支出")
+                    pass
 
-           
-            #去重
-            amount = float(price)
-            if not self.deduplicate.find_duplicate(entry, amount,"wechat_trade_no"):
-                transactions.append(entry)
-
+            
+                #去重
+                amount = float(price)
+                if not self.deduplicate.find_duplicate(entry, amount,"wechat_trade_no"):
+                    transactions.append(entry)
+                pbar.update(1)
         # self.deduplicate.apply_beans()
         return transactions

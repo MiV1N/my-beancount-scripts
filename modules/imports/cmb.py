@@ -14,6 +14,7 @@ from . import (DictReaderStrip, get_account_by_guess,
 from .base import Base
 from .deduplicate import Deduplicate
 import logging
+from tqdm import tqdm
 
 Account招商 = 'Assets:Bank:CMB:3007'
 
@@ -66,13 +67,16 @@ class CMB(Base):
             if line.startswith("交易日期"):
                 start_lines = idx
             
-            if (not line.startswith("#")) and (line != ''):
+            if (not line.startswith("#")) and (line != '') and (line != '\r'):
                 end_lines = idx
             
 
-        print('Import CMB: ' + lines[0])
-        content = "\n".join(lines[start_lines:end_lines])
+        # print('Import CMB: ' + lines[0])
+        content = "\n".join(lines[start_lines:end_lines+1])
+        # logging.error(f"{lines[end_lines+1]}")
         self.content = content
+        self.line_num = end_lines - start_lines
+        self.filename = filename.name
 
         # 去重复
         self.deduplicate = Deduplicate(entries, option_map)
@@ -84,80 +88,85 @@ class CMB(Base):
         # 交易日期,交易时间,收入,支出,余额,交易类型,交易备注
         # "	20231203","	12:56:16","","64.91","221455.46","	银联在线支付","	银联在线支付，（特约）拼多多"
         
-        
-        transactions = []
-        for row in reader:
+                #进度展示
+        with tqdm(total=self.line_num) as pbar:
+            pbar.set_description(f'{self.filename}')
 
-            amount_type = row['交易类型'].strip("\t")
-            # 跳过数据
-            # if skip_transaction(amount_type):
-            #     continue
+            transactions = []
+            for row in reader:
 
-            # 准备元数据
+                amount_type = row['交易类型'].strip("\t")
+                # 跳过数据
+                # if skip_transaction(amount_type):
+                #     pbar.update(1)
+                #     continue
 
-            amount_date = row['交易日期'].strip("\t")
-            amount_time = row['交易时间'].strip("\t")
-            amount_datetime = datetime.strptime(f"{amount_date} {amount_time}","%Y%m%d %H:%M:%S")
+                # 准备元数据
 
-            meta = {}
-            meta['trade_time'] = str(amount_datetime)
-            meta['timestamp'] = str(amount_datetime.timestamp()).replace('.0', '')
+                amount_date = row['交易日期'].strip("\t")
+                amount_time = row['交易时间'].strip("\t")
+                amount_datetime = datetime.strptime(f"{amount_date} {amount_time}","%Y%m%d %H:%M:%S")
 
-            # meta['shop_trade_no']  #无
-            # meta['alipay_trade_no'] #无
+                meta = {}
+                meta['trade_time'] = str(amount_datetime)
+                meta['timestamp'] = str(amount_datetime.timestamp()).replace('.0', '')
 
-            
-            amount_note = row['交易备注'].strip("\t")
-            description = f"{amount_type},{amount_note}"
-            meta['note'] = description
+                # meta['shop_trade_no']  #无
+                # meta['alipay_trade_no'] #无
 
-            meta = data.new_metadata(
-                'beancount/core/testing.beancount',
-                12345,
-                meta
-            )
-            
-            # 构造交易
-            entry = Transaction(
-                    meta,
-                    date(amount_datetime.year, amount_datetime.month, amount_datetime.day),
-                    "*",
-                    "", #无交易对方
-                    description,
-                    data.EMPTY_SET,
-                    data.EMPTY_SET, []
+                
+                amount_note = row['交易备注'].strip("\t")
+                description = f"{amount_type},{amount_note}"
+                meta['note'] = description
+
+                meta = data.new_metadata(
+                    'beancount/core/testing.beancount',
+                    12345,
+                    meta
                 )
+                
+                # 构造交易
+                entry = Transaction(
+                        meta,
+                        date(amount_datetime.year, amount_datetime.month, amount_datetime.day),
+                        "*",
+                        "", #无交易对方
+                        description,
+                        data.EMPTY_SET,
+                        data.EMPTY_SET, []
+                    )
 
-            # 银行账户，支出/收入都会是银行的账户
-            account2 = Account招商
+                # 银行账户，支出/收入都会是银行的账户
+                account2 = Account招商
 
-            amount_out  = True if row["支出"] != "" else False
-            price = row['支出'] if amount_out else row['收入']
-            #支出
-            if amount_out:
-                # 靠支付宝获取其他信息
-                account = get_account_by_guess('', description, amount_datetime)
-                if account == "Expenses:Unknown":
-                    entry = entry._replace(flag='!')
+                amount_out  = True if row["支出"] != "" else False
+                price = row['支出'] if amount_out else row['收入']
+                #支出
+                if amount_out:
+                    # 靠支付宝获取其他信息
+                    account = get_account_by_guess('', description, amount_datetime)
+                    if account == "Expenses:Unknown":
+                        entry = entry._replace(flag='!')
 
-                # 支出，金额写到Expenses账户
-                data.create_simple_posting(entry, account2, f"-{price}",'CNY')
-                data.create_simple_posting(entry, account, price, 'CNY')
+                    # 支出，金额写到Expenses账户
+                    data.create_simple_posting(entry, account2, f"-{price}",'CNY')
+                    data.create_simple_posting(entry, account, price, 'CNY')
 
-            #收入
-            else:
-                income = get_income_account_by_guess('', description, amount_datetime)
-                if income == 'Income:Unknown':
-                    entry = entry._replace(flag='!')
+                #收入
+                else:
+                    income = get_income_account_by_guess('', description, amount_datetime)
+                    if income == 'Income:Unknown':
+                        entry = entry._replace(flag='!')
 
-                # 收入，金额写到收入账户
-                data.create_simple_posting(entry, income, f"-{price}", 'CNY')
-                data.create_simple_posting(entry, account2, price,'CNY')
+                    # 收入，金额写到收入账户
+                    data.create_simple_posting(entry, income, f"-{price}", 'CNY')
+                    data.create_simple_posting(entry, account2, price,'CNY')
 
-            #去重
-            amount = float(price)
-            if not self.deduplicate.find_duplicate(entry, amount):
-                transactions.append(entry)
+                #去重
+                amount = float(price)
+                if not self.deduplicate.find_duplicate(entry, amount):
+                    transactions.append(entry)
 
+                pbar.update(1)
         # self.deduplicate.apply_beans()
         return transactions

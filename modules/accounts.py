@@ -46,7 +46,7 @@ descriptions = {
     '服饰':'Expenses:Clothing',
 
     # ; 食物子分类
-    '餐饮美食|面|下午茶|蛋糕|食品|饼|小炒|早餐|酱香饼|餐饮|点餐|美团|海底捞|灶东家|餐厅|每味每客|莱得快|乡村基|生鲜|果蔬': 'Expenses:Food',  #
+    '餐饮美食|面|下午茶|蛋糕|食品|饼|小炒|吐司|干锅|早餐|盒马|酱香饼|餐饮|点餐|美团|海底捞|灶东家|餐厅|每味每客|莱得快|乡村基|生鲜|果蔬': 'Expenses:Food',  #
     '果仓|果之缘':'Expenses:Food:Snacks',
     '饮品|咖啡|coffee|Coffee|霸王茶姬|贩卖机':"Expenses:Food:Beverages",
 
@@ -75,7 +75,7 @@ descriptions = {
     '推拿|按摩':'Expenses:Entertainment:Massage',
 
     # ; 健康子分类
-    '医院|妇幼保健院|医疗健康':"Expenses:Health:MedicalExpenses",
+    '医院|妇幼保健院|医疗健康|药房':"Expenses:Health:MedicalExpenses",
 
     # ; 教育子分类
     '教育培训':'Expenses:Education',
@@ -97,9 +97,11 @@ descriptions = {
     #好运来:路边肉饼,农民一站:卖菜的,黄建兴|赵二姐:车站鲜肉饼，果行天下:龙德下面的水果摊,谭文勇:龙德门口的肠粉
     #漫步云端: 秦小厨外卖收款
     '段毅':'Expenses:Transportation:Car', #汽车代上牌
+    '陈文泉':'Expenses:Food:Snacks', #陈文泉:龙德下面的水果摊,
+    
 
     # 无法分类
-    '先用后付|琥佳伦园林|陈文泉|任璐|光明|广州宇凡商业管理有限公司|陈明国|英':'Expenses:Miscellaneous:Unknown', #无法分类
+    '先用后付|琥佳伦园林|任璐|光明|广州宇凡商业管理有限公司|陈明国|英':'Expenses:Miscellaneous:Unknown', #无法分类
     '微信转账|二维码收款|收钱码收款':'Expenses:Miscellaneous:Unknown', #无法分类
 }
 
@@ -118,7 +120,7 @@ incomes = {
 
     '建信人寿保险':'Income:Health:Insurance', #保险赔偿
 
-    '退款':'Income:Miscellaneous:Refund',
+    '退款|退货':'Income:Miscellaneous:Refund',
 
     '(汇入汇款|转入).*何瑶':'Income:Miscellaneous:Heyao',
     '汇入汇款.*杨平':'Income:Miscellaneous:Yangping',
