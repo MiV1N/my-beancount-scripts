@@ -91,6 +91,8 @@ descriptions = {
     '取款':"Assets:Cash",
     '华智跟投':"Assets:Investments:UNISINSIGHT",
     '朝朝宝':'Assets:Investments:朝朝宝',
+    '购买零钱+':'Assets:Investments:CITIC:零钱plus',
+    '中信.*信用卡还款':'Liabilities:CreditCard:CITIC:3995',
 
     # 特殊分类（放最后），最后匹配 
     '好运来|农民一站|黄建兴|赵二姐|果行天下|谭文勇|漫步云端':'Expenses:Food', 
@@ -111,8 +113,10 @@ anothers = {
 
 incomes = {
     # 招商银行
-    '工资\s*重庆紫光华山智安科技有限公司|款项.*代发':'Income:Salary:UNISINSIGHT',
+    '工资\s*重庆紫光华山智安科技有限公司|款项.*代发|重庆紫光华山智安科技有限公司.*工资|重庆紫光华山智安科技有限公司.*奖金':'Income:Salary:UNISINSIGHT',
     '重庆紫光华山智安科技有限公司工会委员会|报销.*重庆紫光华山智安':'Income:Miscellaneous:Reimbursement:UNISINSIGHT',
+    # '重庆紫光华山智安科技有限公司.*奖金':'Income:Salary:UNISINSIGHT',
+
     '结息':'Income:Interest',
 
     #wechat
