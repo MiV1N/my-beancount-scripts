@@ -1,0 +1,2 @@
+python alipay_record_20231203_221702.csv --entry ../beancountfiles/main.bean --out out.bean
+python ../beancountfiles/2023/12/data/CMB_6214--------3007_20231104_20231204.csv --entry ../beancountfiles/main.bean --out out.bean

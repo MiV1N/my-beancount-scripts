@@ -12,6 +12,7 @@ from modules.imports.cmb import CMB
 # from modules.imports.abc_credit import ABCCredit
 # from modules.imports.ccb_credit import CCBCredit
 # from modules.imports.citic_credit import CITICCredit
+from modules.imports.citic import CITICC
 # from modules.imports.cmb_credit import CMBCredit
 # from modules.imports.cmbc_credit import CMBCCredit
 # from modules.imports.icbc_credit import ICBCCredit
@@ -25,24 +26,26 @@ logging.basicConfig(level=logging.ERROR)
 # from modules.imports.alipay_prove import AlipayProve
 
 parser = argparse.ArgumentParser("import")
-parser.add_argument("path", help="CSV Path")
-parser.add_argument(
-    "--entry", help="Entry bean path (default = main.bean)", default='main.bean')
+parser.add_argument("--path", help="CSV Path")
+parser.add_argument("--entry", help="Entry bean path (default = main.bean)", default='')
 parser.add_argument("--out", help="Output bean path", default='')
 args = parser.parse_args()
 
-entries, errors, option_map = loader.load_file(args.entry)  #手动记录部分
+entries = None
+if args.entry != '':
+    entries, errors, option_map = loader.load_file(args.entry)  #手动记录部分
 
 # importers = [Alipay, AlipayProve, YuEBao, WeChat,
 #              ABCCredit, CCBCredit, CITICCredit, CMBCCredit, CMBCredit, ICBCCredit,
 #              ICBCDebit]
-importers = [Alipay,CMB,WeChat]
+importers = [Alipay,CMB,WeChat,CITICC]
 
 
 all_path = Path(args.path)
-files = all_path.rglob("*.csv")
+files = list(all_path.rglob("*.csv"))
+files.extend(list(all_path.rglob("*.xls")))
 
-new_entries = entries if len(entries)>0 else []
+new_entries = entries if entries != None and len(entries)>0 else []
 
 # 文件解析
 for file in files:

@@ -99,7 +99,6 @@ class CITICC(Base):
             pbar.set_description(f'{self.filename}')
             transactions = []
             for row in reader:
-
                 amount_note = row['摘要']
                 # 跳过数据
                 if skip_transaction(amount_note):
