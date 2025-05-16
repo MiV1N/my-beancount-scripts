@@ -5,7 +5,8 @@ from zipfile import ZipFile
 from datetime import datetime,date
 from io import StringIO, BytesIO
 
-import dateparser
+# import dateparser
+from dateutil import parser
 from beancount.core import data
 from beancount.core.data import Note, Transaction
 
@@ -106,7 +107,7 @@ class CITICC(Base):
                     continue
 
                 # 准备元数据
-                amount_datetime = datetime.strptime(f"{row['交易日期']}","%Y-%m-%d %H:%M:%S")
+                amount_datetime = parser.parse(row['交易日期'])
 
                 meta = {}
                 meta['trade_time'] = str(amount_datetime)

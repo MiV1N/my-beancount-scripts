@@ -5,7 +5,8 @@ from zipfile import ZipFile
 from datetime import datetime,date
 from io import StringIO, BytesIO
 
-import dateparser
+# import dateparser
+from dateutil import parser
 from beancount.core import data
 from beancount.core.data import Note, Transaction
 
@@ -81,6 +82,20 @@ class CMB(Base):
         # 去重复
         self.deduplicate = Deduplicate(entries, option_map)
 
+    def check_none(self,row):
+        # 检查字典中值是不是都存在
+        one_is_present = False
+        for key, value in row.items():
+            if key in ["交易日期","交易时间"]:
+                if value is None or value == '':  # 添加对空列表和空字典的判断
+                    return False
+            elif key in ["收入","支出"]:
+                if value != '':
+                    one_is_present = True
+
+        return one_is_present  
+                
+
     def parse(self):
         content = self.content
         f = StringIO(content)
@@ -95,6 +110,9 @@ class CMB(Base):
             transactions = []
             for row in reader:
 
+                if not self.check_none(row):
+                    continue
+                
                 amount_type = row['交易类型'].strip("\t")
                 # 跳过数据
                 # if skip_transaction(amount_type):
@@ -105,7 +123,7 @@ class CMB(Base):
 
                 amount_date = row['交易日期'].strip("\t")
                 amount_time = row['交易时间'].strip("\t")
-                amount_datetime = datetime.strptime(f"{amount_date} {amount_time}","%Y%m%d %H:%M:%S")
+                amount_datetime = parser.parse(f"{amount_date} {amount_time}")
 
                 meta = {}
                 meta['trade_time'] = str(amount_datetime)

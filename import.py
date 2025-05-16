@@ -20,7 +20,8 @@ from modules.imports.citic import CITICC
 from modules.imports.wechat import WeChat
 import logging
 
-logging.basicConfig(level=logging.ERROR)
+# logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.DEBUG)
 
 # from modules.imports.yuebao import YuEBao
 # from modules.imports.alipay_prove import AlipayProve
@@ -70,8 +71,15 @@ if save_name == "":
     now = datetime.now()
     save_name = f'{all_path.absolute()}/{now.strftime("%Y%m%d")}.bean'
 
+########写入文件###########
+# 1. 先按date排序，之后按meta里面的timestamp排序
+def sort_key(entry):  
+    meta = getattr(entry, 'meta', '')  
+    return (entry.date, meta["timestamp"])  
+sorted_entries = sorted(new_entries, key=sort_key, reverse=True)
+
 with open(save_name, 'w', encoding='utf-8') as f:
-    printer.print_entries(new_entries, file=f)
+    printer.print_entries(sorted_entries, file=f)
 
 print('Outputed to ' + save_name)
 exit(0)

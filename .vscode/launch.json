@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "cwd": "${workspaceFolder}",
+      "name": "Python: 去重Debug",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/import.py",
+      "args": [
+        "--path",
+        "test_datas/去重/",
+        "--entry",
+        "test_datas/inbox.bean"
+        // "./",
+        // "--entry",
+        // "../beancountfiles/main.bean",
+        // "--out",
+        // "out.bean"
+      ],
+      "console": "integratedTerminal",
+      "python": "${workspaceFolder}/../.venv/Scripts/python.exe"
+    }
+  ]
+}

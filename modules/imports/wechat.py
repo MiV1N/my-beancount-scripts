@@ -5,7 +5,8 @@ from zipfile import ZipFile
 from datetime import datetime,date
 from io import StringIO, BytesIO
 
-import dateparser
+# import dateparser
+from dateutil import parser
 from beancount.core import data
 from beancount.core.data import Note, Transaction
 
@@ -101,7 +102,7 @@ class WeChat(Base):
                 # 准备元数据
 
                 amount_time = row['交易时间']
-                amount_datetime = datetime.strptime(amount_time,"%Y-%m-%d %H:%M:%S")
+                amount_datetime = parser.parse(amount_time)
 
                 meta = {}
                 meta['trade_time'] = str(amount_datetime)

@@ -1,5 +1,9 @@
-from beancount.query import query, query_compile
-from beancount.query.query_env import TargetsEnvironment
+# from beancount.query import query, query_compile
+# from beancount.query.query_env import TargetsEnvironment
+# from beanquery.query import query
+# from beanquery.environment import Environment
+# from beanquery.functions import Function
+
 from ..accounts import *
 import csv
 
@@ -76,16 +80,18 @@ class DictReaderStrip(csv.DictReader):
         return d
 
 
-class Metas(query_compile.EvalFunction):
-    __intypes__ = []
+# # 定义一个Metas类，继承自query_compile.EvalFunction，用于处理元数据
+# class Metas(query_compile.EvalFunction):
+#     __intypes__ = []
 
-    def __init__(self, operands):
-        super().__init__(operands, object)
+#     def __init__(self, operands):
+#         super().__init__(operands, object)
 
-    def __call__(self, context):
-        args = self.eval_args(context)
-        meta = context.entry.meta
-        return meta
+#     def __call__(self, context):
+#         args = self.eval_args(context)
+#         meta = context.entry.meta
+#         return meta
 
 
-TargetsEnvironment.functions['metas'] = Metas
+# # 将Metas类注册到TargetsEnvironment的函数中
+# TargetsEnvironment.functions['metas'] = Metas
