@@ -66,10 +66,7 @@ for file in files:
             logging.debug(e)
             pass
 
-save_name = args.out
-if save_name == "":
-    now = datetime.now()
-    save_name = f'{all_path.absolute()}/{now.strftime("%Y%m%d")}.bean'
+
 
 ########写入文件###########
 # 1. 先按date排序，之后按meta里面的timestamp排序
@@ -77,6 +74,13 @@ def sort_key(entry):
     meta = getattr(entry, 'meta', '')  
     return (entry.date, meta["timestamp"])  
 sorted_entries = sorted(new_entries, key=sort_key, reverse=True)
+
+# 保存名称按交易时间区间命名
+save_name = args.out
+if save_name == "":
+    start_date = sorted_entries[-1].date.strftime("%Y%m%d")
+    end_date = sorted_entries[0].date.strftime("%Y%m%d")
+    save_name = f'{all_path.absolute()}/{start_date}-{end_date}.bean'
 
 with open(save_name, 'w', encoding='utf-8') as f:
     printer.print_entries(sorted_entries, file=f)
