@@ -38,9 +38,7 @@ def get_account_by_map(description):
 # 需要跳过的交易
 
 # 对于支付宝等线上交易，通过支付宝，微信拉取交易信息
-skip_transaction_map = [
-    "(财付通)",  #微信支付
-]
+skip_transaction_map = []
 
 skip_transaction_res = [re.compile(key) for key in skip_transaction_map]
 
