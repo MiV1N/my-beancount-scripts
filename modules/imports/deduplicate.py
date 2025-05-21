@@ -4,7 +4,7 @@ from beanquery import query
 # from beancount.query import query
 
 from ..accounts import public_accounts
-
+from enum import  IntEnum
 
 # 查询语句:bean-query main.bean "SELECT entry, entry.meta, meta FROM YEAR = 2023"
 # 查询结果:
@@ -77,9 +77,22 @@ class Deduplicate:
         if self.entries == None or len(self.entries) == 0 or entry == None:
             return False
         
-        # 查询已经导入的日期相同金额相同的交易
-        bql = "SELECT flag, filename, lineno, location, account, year, month, day, str(entry_meta('timestamp')) as timestamp, entry.meta as metas, entry WHERE year = {} AND month = {} AND day = {} AND number(convert(units(position), '{}')) = {} ORDER BY timestamp ASC".format(
-            entry.date.year, entry.date.month, entry.date.day, currency, money)
+        # 资产的支出或收入
+        asset_amount = entry.postings[0].units.number if "Assets" in entry.postings[0].account else -entry.postings[0].units.number
+        # 查询已经导入的日期相同金额相同的交易,account正则匹配A
+        bql = f"""SELECT 
+                    flag, 
+                    str(entry_meta('timestamp')) as timestamp, 
+                    entry.meta as metas, 
+                    entry
+                WHERE 
+                    year = {entry.date.year} AND 
+                    month = {entry.date.month} AND 
+                    day = {entry.date.day} AND 
+                    number(convert(units(position), '{currency}')) = {asset_amount} AND   
+                    account ~ 'Assets'
+                ORDER BY timestamp ASC"""
+
         items = query.run_query(self.entries, self.option_map, bql)
         rows = items[1]
 
@@ -89,7 +102,7 @@ class Deduplicate:
         
         updated_items = []
         for row in rows:
-            _flag, _filename, _lineno, _location, _account, _year, _month, _day, _timestamp, _metas, _entry = row
+            _flag, _timestamp, _metas, _entry = row
             _postings = _entry.postings
             # item_timestamp = _timestamp.replace("'", '')
 
@@ -117,44 +130,74 @@ class Deduplicate:
                 time_gap = abs(int(_timestamp) - int(entry.meta['timestamp'])) # 单位:秒
                 if time_gap > tolerance:
                     continue
-                        
-            ########### 剩下的需要合并的处理的条件 #######
-            # 1. 待导入和已导入的交易中至少一方的meta中没有时间信息
-            # 2. 待导入和已导入的交易meta中都存在时间信息，但是交易间隔时间差距在10s内
 
-            ############META信息合并####################
-            # 将待导入的交易信息补全到已经导入的交易的meta信息，当前待导入的数据丢掉
-            for key, value in entry.meta.items():
+            # 添加到待合并的列表
+            updated_items.append(row)
 
-                if key in ['filename','lineno',]:  
-                    continue
+        be_modify_row = None
+        # 如果待合并的列表不为空，则进行合并
+        if len(updated_items) == 0:
+            return False
+        elif len(updated_items) == 1:
+            be_modify_row = updated_items[0]
+        else:
+            # 合并交易
+            min_time_gap = 9999
+            min_time_gap_index = 0
+            for __index,__row in enumerate(updated_items):
 
-                ######## 已导入的条目中key不存在  #########
-                # 待导入交易的新增属性，直接添加到已导入的交易中
-                if _metas == None or key not in _metas: 
-                    _metas[key] = value
-                    continue
+                _flag, _timestamp, _metas, _entry = __row
+                _postings = _entry.postings
+                # 选择timestamp与entry.meta['timestamp']最接近的交易
+                # 计算时间差
+                time_gap = abs(int(_entry.meta['timestamp']) - int(entry.meta['timestamp']))
+                if time_gap < min_time_gap:
+                    min_time_gap = time_gap
+                    min_time_gap_index = __index
 
-                ######### key存在但是为None，'' #########
-                # 处理时间信息可能一方为空()，或者双方都为空 #
-                # 可能性:
-                # 1. _metas中为None 或 '', 待导入中value==''或者None  -> 被待导入的value替换
-                # 2. _metas中为None 或 '', 待导入中value有值          -> 被待导入的value替换
-                # 3. _metas中有值        , 待导入中value==''或者None  -> 保留_metas中的值，即:不处理该情况
-                # 4. _metas中有值        , 待导入中value有值          -> 需要区分处理，是合并，还是保留其一
-                if _metas[key] == None or _metas[key].strip() == '':  #情况1，2
-                    _metas[key] = value.strip()    
-                    continue  
-                
-                if value != None or value.strip()  != '':            # 情况4
-                    if key in ['trade_time','timestamp']:            # 时间信息保留精度高的一个
-                        if key == "trade_time" and _metas['trade_time'][-2:] == "00":          #秒为0，形如:'2024-02-26 21:24:00'，用于处理支付宝这样时间只到分钟
-                            _metas[key] = value          #  使用待导入的时间
-                        if key == "timestamp" and int(_metas["timestamp"]) % 60 == 0:               #秒为0
-                            _metas[key] = value          #  使用待导入的时间
+            
+            be_modify_row = updated_items[min_time_gap_index]
 
-                    elif value != _metas[key]:                       #其他文本信息，直接合并，主要是note
-                        _metas[key] += value
+
+        _flag, _timestamp, _metas, _entry = be_modify_row
+        _postings = _entry.postings
+        ########### 剩下的需要合并的处理的条件 #######
+        # 1. 待导入和已导入的交易中至少一方的meta中没有时间信息
+        # 2. 待导入和已导入的交易meta中都存在时间信息，但是交易间隔时间差距在10s内
+
+        ############META信息合并####################
+        # 将待导入的交易信息补全到已经导入的交易的meta信息，当前待导入的数据丢掉
+        for key, value in entry.meta.items():
+
+            if key in ['filename','lineno',]:  
+                continue
+
+            ######## 已导入的条目中key不存在  #########
+            # 待导入交易的新增属性，直接添加到已导入的交易中
+            if _metas == None or key not in _metas: 
+                _metas[key] = value
+                continue
+
+            ######### key存在但是为None，'' #########
+            # 处理时间信息可能一方为空()，或者双方都为空 #
+            # 可能性:
+            # 1. _metas中为None 或 '', 待导入中value==''或者None  -> 被待导入的value替换
+            # 2. _metas中为None 或 '', 待导入中value有值          -> 被待导入的value替换
+            # 3. _metas中有值        , 待导入中value==''或者None  -> 保留_metas中的值，即:不处理该情况
+            # 4. _metas中有值        , 待导入中value有值          -> 需要区分处理，是合并，还是保留其一
+            if _metas[key] == None or _metas[key].strip() == '':  #情况1，2
+                _metas[key] = value.strip()    
+                continue  
+            
+            if value != None or value.strip()  != '':            # 情况4
+                if key in ['trade_time','timestamp']:            # 时间信息保留精度高的一个
+                    if key == "trade_time" and _metas['trade_time'][-2:] == "00":          #秒为0，形如:'2024-02-26 21:24:00'，用于处理支付宝这样时间只到分钟
+                        _metas[key] = value          #  使用待导入的时间
+                    if key == "timestamp" and int(_metas["timestamp"]) % 60 == 0:               #秒为0
+                        _metas[key] = value          #  使用待导入的时间
+
+                elif value != _metas[key]:                       #其他文本信息，直接合并，主要是note
+                    _metas[key] += value
 
             ###########posting合并#############
             # 1. Unknown需要判断是否有未知账户
@@ -165,7 +208,7 @@ class Deduplicate:
                 all_posting.extend(_postings)
                 all_posting.extend(entry.postings)
 
-                new_postings = self.postings_merge(all_posting)
+                new_postings = Deduplicate.postings_merge(all_posting)
 
                 _postings.clear() 
                 _postings.extend(new_postings) 
@@ -180,57 +223,80 @@ class Deduplicate:
             # 替换已导入的交易条目
             # 查找相同条目
             index = self.entries.index(_entry)
-            del self.entries[index] 
-            self.entries.append(new_transaction)
+            self.entries[index] = new_transaction
             return True
     
         # 遍历完查询出来的结果都没有相同的交易
         return False
 
-    def postings_filte(self,postings:list):
-        new_posting = postings[0] #合并为一个
-        number = postings[0].units.number
+    """
+    选择其中一个合适的交易返回，其他交易过滤掉。
+    Args:
+        postings (list): 交易记录列表。
+    Returns:
+        Posting: 选择的交易记录。
+    """
+    @staticmethod
+    def postings_filte( postings: list):
+        class Account_type(IntEnum):
+            NONE = 1
+            UNKNOWN = 2
+            FAMILY_PAYMENT = 3
+            OTHER = 4                     # 消费账户
+            MOBILEPAYMENT = 5             # 资产
+            BANK = 6                      # 资产
+            
 
-        is_new_posting_ok = False
-        if ("Unknown" not in new_posting.account) and \
-            ("Transfer:Heyao" not in new_posting.account):
-            is_new_posting_ok = True
+        new_posting = None
+        new_posting_type = Account_type.NONE
 
-        tmp_post = None
-        for post in postings[1:]:
+        # number = postings[0].units.number
+       
+        # 不确定的交易主要是 Unknown 和 亲情付，亲情付账户当前标注为:Transfer:Heyao 
+        # --> 需要尽可能去除
+        # 对于付款账户
+        # --> 尽可能选择银行账户
+        # 其他都无所谓
+        for post in postings:
 
-            # 前面的bql 条件为金额相同，这里不会存在金额不同的金额
-            # if number != post.units.number:
-            #     print("！！！同一个交易的金额不匹配")
 
-            if 'Unknown' not in post.account:
-                if "Transfer:Heyao"  in post.account:
-                    tmp_post = post
-                else:
-                    if not is_new_posting_ok:
-                        is_new_posting_ok = True
-                        tmp_post = None
-                        new_posting = post
+            # 确认交易类型
+            if "Unknown"  in post.account:
+                post_type = Account_type.UNKNOWN
+            elif "Transfer:Heyao"  in post.account:
+                post_type = Account_type.FAMILY_PAYMENT
+            elif "MobilePayment"  in post.account:
+                post_type = Account_type.MOBILEPAYMENT
+            elif "Bank"  in post.account:
+                post_type = Account_type.BANK
+            else:
+                post_type = Account_type.OTHER
 
-                    else: #多个非Unknown的情况
-                        if new_posting.units.number != post.units.number:
-                            print("!!!相同交易的金额不同")
-                        if new_posting.account != post.account:
-                            print("!!!相同交易的账户不同")
-
-        #  优先使用亲情付账户，其次是随便取一个
-        if not is_new_posting_ok: 
-            new_posting = tmp_post if tmp_post != None else new_posting
+            # 替换待返回交易临时存储
+            if post_type > new_posting_type :
+                new_posting = post 
+                new_posting_type = post_type
+            
+            # 多个非正常账户的相同金额，这种情况程序可能有异常，需要提示定位
+            # 银行和移动支付可以相同，因为移动支付最终扣的银行的钱，当前已经兼容了
+            if  ((new_posting != post)  and
+                 (new_posting_type == post_type == Account_type.OTHER)):
+                print(f"交易合并选择冲突:\n交易:{new_posting.account},金额:{new_posting.units.number},与\n交易:{post.account},金额:{post.units.number}")
+            # 下面的代码屏蔽，主要是导入脚本还有写问题，要继续遍历检查数据是不是有问题
+            # Account_type.NORMAL 类型可以不用继续遍历了
+            # if new_posting_type == Account_type.NORMAL:
+            #     return new_posting
 
         return new_posting
 
-    def postings_merge(self,postings:list):
+    @staticmethod
+    def postings_merge(postings:list):
 
         post_out = [post for post in postings if post.units.number < 0]
         post_in = [post for post in postings if post.units.number >= 0]
 
-        new_post  = [self.postings_filte(post_out)]
-        new_post.append(self.postings_filte(post_in))
+        new_post  = [Deduplicate.postings_filte(post_out)]
+        new_post.append(Deduplicate.postings_filte(post_in))
 
         return  new_post
         

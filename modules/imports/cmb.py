@@ -111,6 +111,7 @@ class CMB(Base):
             for row in reader:
 
                 if not self.check_none(row):
+                    pbar.update(1)
                     continue
                 
                 amount_type = row['交易类型'].strip("\t")

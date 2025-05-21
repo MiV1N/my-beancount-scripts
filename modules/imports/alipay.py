@@ -74,9 +74,9 @@ class Alipay(Base):
             pbar.set_description(f'{self.filename}')
 
             # 解析账单
+            # 不计收支类型 需要计入账单，因为不计收支主要是退款，但是付款被记录了，特别是上一个导入周期付款，下一个导入周期退款，导致处理为不计账单很难。
             for row in reader:
-                if (row['交易状态'] in ('交易关闭','冻结成功')) or \
-                (row['收/支'] in ('不计收支') ) :
+                if (row['交易状态'] in ('交易关闭','冻结成功')):
                     pbar.update(1)
                     continue
     
@@ -130,7 +130,7 @@ class Alipay(Base):
                     data.create_simple_posting(entry, account2, f"-{price}",'CNY')
 
                 #收入
-                elif row['收/支'] in ('收入'):
+                elif row['收/支'] in ('收入') or ( row['收/支'] in ('不计收支') and '退款' in  row['商品说明'] ) :
                     income = get_income_account_by_guess(row['交易对方'], description, time)
                     if income == 'Income:Unknown':
                         entry = entry._replace(flag='!')
@@ -145,44 +145,45 @@ class Alipay(Base):
                     pass
 
                 
-                # 合并相同时间戳的账单
+                # 合并相同时间戳的账单(支付宝的时间只精确到分钟，不能这样合并)
                 # 支付宝在盒马上存在同一时间戳产生三个账单，但是银行卡只有一条合并的记录,合并后才能去重
                 # 由于账单是时间排序的，相同的账单一定紧邻
-                if len(transactions) != 0 and transactions[-1].meta["timestamp"] == entry.meta['timestamp']:
-                    pre_entry = transactions[-1]
+                # if len(transactions) != 0 and transactions[-1].meta["timestamp"] == entry.meta['timestamp']:
+                #     pre_entry = transactions[-1]
 
-                    amount_in = 0
-                    amount_in_post = None
-                    amount_out = 0
-                    amount_out_post = None
+                #     amount_in = 0
+                #     amount_in_post = None
+                #     amount_out = 0
+                #     amount_out_post = None
 
-                    for post in pre_entry.postings:
-                        amount = post.units.number
-                        if amount > 0:
-                            amount_in += amount
-                            amount_in_post = post
-                        elif amount < 0:
-                            amount_out += amount
-                            amount_out_post = post
-                        else: #使用医保挂号，出现支付金额为0
-                            amount_in_post = post if amount_in_post == None else amount_in_post
-                            amount_out_post = post if amount_in_post != None else amount_out_post
+                #     for post in pre_entry.postings:
+                #         amount = post.units.number
+                #         if amount > 0:
+                #             amount_in += amount
+                #             amount_in_post = post
+                #         elif amount < 0:
+                #             amount_out += amount
+                #             amount_out_post = post
+                #         else: #使用医保挂号，出现支付金额为0
+                #             amount_in_post = post if amount_in_post == None else amount_in_post
+                #             amount_out_post = post if amount_in_post != None else amount_out_post
 
         
-                    new_units = amount_in_post.units._replace(number = amount_in)
-                    amount_in_post = amount_in_post._replace(units = new_units)
+                #     new_units = amount_in_post.units._replace(number = amount_in)
+                #     amount_in_post = amount_in_post._replace(units = new_units)
 
-                    new_units = amount_in_post.units._replace(number = amount_out)
-                    amount_out_post = amount_out_post._replace(units = new_units)
+                #     new_units = amount_in_post.units._replace(number = amount_out)
+                #     amount_out_post = amount_out_post._replace(units = new_units)
 
-                    pre_entry.postings.clear()
-                    pre_entry.postings.append(amount_in_post) 
-                    pre_entry.postings.append(amount_out_post) 
-                else:
-                    #去重
-                    amount = float(row['金额'])
-                    if not self.deduplicate.find_duplicate(entry, amount, 'alipay_trade_no'):
-                        transactions.append(entry)
+                #     pre_entry.postings.clear()
+                #     pre_entry.postings.append(amount_in_post) 
+                #     pre_entry.postings.append(amount_out_post) 
+                # else:
+
+                #去重
+                amount = float(row['金额'])
+                if not self.deduplicate.find_duplicate(entry, amount, 'alipay_trade_no'):
+                    transactions.append(entry)
 
                 pbar.update(1)
 
