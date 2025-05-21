@@ -36,7 +36,7 @@ class Alipay(Base):
 
     def __init__(self, filename, byte_content, entries, option_map):
 
-        if not re.search(r'alipay_record_.*\.csv$', filename.name):
+        if not re.search(r'[alipay_record_|支付宝交易明细].*\.csv$', filename.name):
             raise Exception("not alipay ,skip")
 
         content = byte_content.decode('gbk')
