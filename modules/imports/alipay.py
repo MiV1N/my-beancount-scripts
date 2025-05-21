@@ -62,6 +62,29 @@ class Alipay(Base):
         # 去重复
         self.deduplicate = Deduplicate(entries, option_map)
 
+    def is_income(self,row):
+        #优先'收/支'字段判定
+        if row['收/支'] in ('收入') :
+            return True
+        elif row['收/支'] in ('支出'):
+            return False
+
+        # 描述字段判定 row['收/支'] in ('不计收支') 
+        income_describes = ["退款","赔付","转入"]
+        for _ in income_describes:
+            if _ in row['商品说明']:
+                return True
+            
+        # 描述字段判定支出 row['收/支'] in ('不计收支') 
+        outcome_describes = [""]
+        for _ in outcome_describes:
+            if _ in row['商品说明']:
+                return False
+
+        print("！！！非收入/支出！！！！")
+        print(f"{row['交易分类']},{row['交易对方']},{row['商品说明']},{row['备注']}")
+        return False
+
     def parse(self):
         content = self.content
         f = StringIO(content)
@@ -117,8 +140,18 @@ class Alipay(Base):
 
                 account2 = get_account_by_map(row['收/付款方式'])
 
-                #支出
-                if row['收/支'] in ('支出'):
+                #收入
+                if self.is_income(row) :
+                    income = get_income_account_by_guess(row['交易对方'], description, time)
+                    if income == 'Income:Unknown':
+                        entry = entry._replace(flag='!')
+
+                    price = row['金额']
+                    # 金额为正，写入到支付宝的账户中
+                    data.create_simple_posting(entry, account2, price,'CNY')
+                    data.create_simple_posting(entry, income, f"-{price}", 'CNY')
+                    
+                else:
                     account = get_account_by_guess(row['交易对方'], description, time)
                     if account == "Expenses:Unknown":
                         entry = entry._replace(flag='!')
@@ -129,20 +162,6 @@ class Alipay(Base):
                     data.create_simple_posting(entry, account, price, 'CNY')
                     data.create_simple_posting(entry, account2, f"-{price}",'CNY')
 
-                #收入
-                elif row['收/支'] in ('收入') or ( row['收/支'] in ('不计收支') and '退款' in  row['商品说明'] ) :
-                    income = get_income_account_by_guess(row['交易对方'], description, time)
-                    if income == 'Income:Unknown':
-                        entry = entry._replace(flag='!')
-
-                    price = row['金额']
-                    # 金额为正，写入到支付宝的账户中
-                    data.create_simple_posting(entry, account2, price,'CNY')
-                    data.create_simple_posting(entry, income, f"-{price}", 'CNY')
-
-                else:
-                    print("非收入/支出")
-                    pass
 
                 
                 # 合并相同时间戳的账单(支付宝的时间只精确到分钟，不能这样合并)
