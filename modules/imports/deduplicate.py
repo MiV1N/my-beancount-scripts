@@ -73,7 +73,7 @@ class Deduplicate:
         self.beans = {}
 
     def find_duplicate(self, entry, money, unique_no=None, replace_account='', currency='CNY'):
-        
+        return False
         if self.entries == None or len(self.entries) == 0 or entry == None:
             return False
         
