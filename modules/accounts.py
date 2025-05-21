@@ -81,6 +81,7 @@ descriptions = {
     '教育培训':'Expenses:Education',
 
     # ; 杂项子分类
+    '取款':"Expenses:Miscellaneous:Cash", #取款认为是消费
     '母婴亲子': 'Expenses:Miscellaneous:杨青晓',
     '亲情卡': 'Expenses:Miscellaneous:Transfer:Heyao',
     '转账.*(何)*瑶':'Expenses:Miscellaneous:Transfer:Heyao',
@@ -88,7 +89,6 @@ descriptions = {
     '转账.*唐大秀':'Expenses:Miscellaneous:Transfer:Tangdaxiu',
     
     # 内部转账
-    '取款':"Assets:Cash",
     '华智跟投':"Assets:Investments:UNISINSIGHT",
     '朝朝宝':'Assets:Investments:朝朝宝',
     '购买零钱+':'Assets:Investments:CITIC:零钱plus',
