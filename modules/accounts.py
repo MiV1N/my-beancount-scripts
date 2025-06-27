@@ -39,9 +39,13 @@ accounts = {
     '零钱': 'Assets:Balances:WeChat',
 }
 
+
+name = {
+
+
+}
+
 descriptions = {
-
-
     # ; 服装子分类
     '服饰':'Expenses:Clothing',
 
@@ -90,6 +94,7 @@ descriptions = {
     
     # 内部转账
     '华智跟投':"Assets:Investments:UNISINSIGHT",
+    '雪球基金|基金申购':"Assets:Investments:雪球基金",
     '朝朝宝':'Assets:Investments:朝朝宝',
     '购买零钱+':'Assets:Investments:CITIC:零钱plus',
     '中信.*信用卡还款':'Liabilities:CreditCard:CITIC:3995',
@@ -130,6 +135,14 @@ incomes = {
     '汇入汇款.*杨平':'Income:Miscellaneous:Yangping',
     '汇入汇款.*唐大秀':'Income:Miscellaneous:Tangdaxiu',
     
+
+    # 内部转账
+    '华智跟投':"Assets:Investments:UNISINSIGHT",
+    '朝朝宝':'Assets:Investments:朝朝宝',
+    '雪球基金|基金申购':"Assets:Investments:雪球基金",
+    '零钱+':'Assets:Investments:CITIC:零钱plus',
+    '中信.*信用卡还款':'Liabilities:CreditCard:CITIC:3995',
+
     # 无法分类
     '群收款|微信转账':'Income:Miscellaneous:Unknown', #无法分类
 

@@ -72,11 +72,19 @@ class Deduplicate:
         self.option_map = option_map
         self.beans = {}
 
-    def find_duplicate(self, entry, money, unique_no=None, replace_account='', currency='CNY'):
+    def skip_add_to_beancount(self, entry):
+        # 检查entry的所有postings中的account是否包含"Assets:Bank"
+        for posting in entry.postings:
+            if "Assets:Bank" in posting.account:
+                return True
         return False
+
+    def find_duplicate(self, entry, money, unique_no=None, replace_account='', currency='CNY'):
         if self.entries == None or len(self.entries) == 0 or entry == None:
             return False
         
+
+        return_vaule = self.skip_add_to_beancount(entry)
         # 资产的支出或收入
         asset_amount = entry.postings[0].units.number if "Assets" in entry.postings[0].account else -entry.postings[0].units.number
         # 查询已经导入的日期相同金额相同的交易,account正则匹配A
@@ -98,7 +106,7 @@ class Deduplicate:
 
         length = len(rows)
         if (length == 0):
-            return False
+            return return_vaule if return_vaule else False
         
         updated_items = []
         for row in rows:
@@ -137,7 +145,7 @@ class Deduplicate:
         be_modify_row = None
         # 如果待合并的列表不为空，则进行合并
         if len(updated_items) == 0:
-            return False
+            return return_vaule if return_vaule else False
         elif len(updated_items) == 1:
             be_modify_row = updated_items[0]
         else:
@@ -227,7 +235,7 @@ class Deduplicate:
             return True
     
         # 遍历完查询出来的结果都没有相同的交易
-        return False
+        return return_vaule if return_vaule else False
 
     """
     选择其中一个合适的交易返回，其他交易过滤掉。

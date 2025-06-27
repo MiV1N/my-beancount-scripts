@@ -50,6 +50,16 @@ all_path = Path(args.path)
 files = list(all_path.rglob("*.csv"))
 files.extend(list(all_path.rglob("*.xls")))
 
+# 将包含“中信”或“CMB”名称的文件放到列表最前面
+def file_priority(file):
+    name = file.name.lower()
+    if "中信" in name or "citic" in name or "cmb" in name:
+        return 0
+    return 1
+
+files = sorted(files, key=file_priority)
+
+
 new_entries = entry if entry != None and len(entry)>0 else []
 
 # 文件解析
