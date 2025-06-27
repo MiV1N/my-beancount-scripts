@@ -181,10 +181,9 @@ class CMB(Base):
                     data.create_simple_posting(entry, income, f"-{price}", 'CNY')
                     data.create_simple_posting(entry, account2, price,'CNY')
 
-                #去重
+                #银行账单不去重
                 amount = float(price)
-                if not self.deduplicate.find_duplicate(entry, amount):
-                    transactions.append(entry)
+                transactions.append(entry)
 
                 pbar.update(1)
         # self.deduplicate.apply_beans()

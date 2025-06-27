@@ -42,8 +42,8 @@ if args.entry != '':
 # importers = [Alipay, AlipayProve, YuEBao, WeChat,
 #              ABCCredit, CCBCredit, CITICCredit, CMBCCredit, CMBCredit, ICBCCredit,
 #              ICBCDebit]
-# importers = [Alipay,CMB,WeChat,CITICC]
-importers = [CMB,CITICC]
+importers = [Alipay,CMB,WeChat,CITICC]
+# importers = [CMB,CITICC]
 
 
 all_path = Path(args.path)
