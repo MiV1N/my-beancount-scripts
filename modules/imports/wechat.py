@@ -20,7 +20,9 @@ from tqdm import tqdm
 Account_WeChat = 'Assets:MobilePayment:WeChat'
 
 account_map = {
-    "招商银行\(3007\)":"Assets:Bank:CMB:3007"
+    "招商银行\(3007\)":"Assets:Bank:CMB:3007",
+    "中信银行信用卡\(3995\)":"Liabilities:CreditCard:CITIC:3995",
+    "中信银行储蓄卡\(5999\)":"Assets:Bank:CITIC:5999"
 }
 
 account_map_res = dict([(key, re.compile(key)) for key in account_map])
