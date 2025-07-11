@@ -15,6 +15,7 @@ from modules.imports.cmb import CMB
 # from modules.imports.ccb_credit import CCBCredit
 # from modules.imports.citic_credit import CITICCredit
 from modules.imports.citic import CITICC
+from modules.imports.citic_credit import CITICCredit
 # from modules.imports.cmb_credit import CMBCredit
 # from modules.imports.cmbc_credit import CMBCCredit
 # from modules.imports.icbc_credit import ICBCCredit
@@ -42,7 +43,7 @@ if args.entry != '':
 # importers = [Alipay, AlipayProve, YuEBao, WeChat,
 #              ABCCredit, CCBCredit, CITICCredit, CMBCCredit, CMBCredit, ICBCCredit,
 #              ICBCDebit]
-importers = [Alipay,CMB,WeChat,CITICC]
+importers = [Alipay,CMB,WeChat,CITICC,CITICCredit]
 # importers = [CMB,CITICC]
 
 
