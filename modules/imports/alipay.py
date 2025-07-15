@@ -18,10 +18,11 @@ from tqdm import tqdm
 Account支付宝 = 'Assets:MobilePayment:Alipay'
 
 account_map = {
-    "招商":"Assets:Bank:CMB:3007"
+    "招商":"Assets:Bank:CMB:3007",
 }
 
 account_map_res = dict([(key, re.compile(key)) for key in account_map])
+
 
 
 def get_account_by_map(description):
@@ -64,13 +65,13 @@ class Alipay(Base):
 
     def is_income(self,row):
         #优先'收/支'字段判定
-        if row['收/支'] in ('收入') :
+        if (row['收/支']!= '') and (row['收/支'] in ('收入') ):
             return True
-        elif row['收/支'] in ('支出'):
+        elif (row['收/支']!= '') and (row['收/支'] in ('支出')):
             return False
 
         # 描述字段判定 row['收/支'] in ('不计收支') 
-        income_describes = ["退款","赔付","转入"]
+        income_describes = ["退款","赔付","转入","收益发放"]
         for _ in income_describes:
             if _ in row['商品说明']:
                 return True
@@ -99,10 +100,21 @@ class Alipay(Base):
             # 解析账单
             # 不计收支类型 需要计入账单，因为不计收支主要是退款，但是付款被记录了，特别是上一个导入周期付款，下一个导入周期退款，导致处理为不计账单很难。
             for row in reader:
-                if (row['交易状态'] in ('交易关闭','冻结成功')):
+                if (row['交易状态'] != '') and (row['交易状态'] in ('交易关闭','冻结成功')):
                     pbar.update(1)
                     continue
     
+
+                if (row['收/付款方式'] != '') and (row['收/付款方式'] in ('工商银行储蓄卡(6614)')):  #工商银行基本上不储蓄，不添加到记账中
+                    pbar.update(1)
+                    continue
+
+
+                if (row['商品说明'] != '') and (row['商品说明'] in ('余额宝-自动转入','转账收款到余额宝')):  #余额宝也认为是余额，余额和余额宝的互转不记录
+                    pbar.update(1)
+                    continue
+
+
                 # 准备元数据
                 time = row['交易时间']
                 # print("Importing {} at {}".format(row['商品说明'], time))
