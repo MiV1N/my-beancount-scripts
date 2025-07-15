@@ -22,7 +22,8 @@ Account_WeChat = 'Assets:MobilePayment:WeChat'
 account_map = {
     "招商银行\(3007\)":"Assets:Bank:CMB:3007",
     "中信银行信用卡\(3995\)":"Liabilities:CreditCard:CITIC:3995",
-    "中信银行储蓄卡\(5999\)":"Assets:Bank:CITIC:5999"
+    "中信银行储蓄卡\(5999\)":"Assets:Bank:CITIC:5999",
+    "中信银行\(5999\)":"Assets:Bank:CITIC:5999"
 }
 
 account_map_res = dict([(key, re.compile(key)) for key in account_map])
@@ -39,8 +40,13 @@ def get_account_by_map(description):
 
 # 对于线上交易，跳过退款的支出和收入部分
 skip_transaction_map = [
-    "退款"
+    "已全额退款"  #微信有两种退款，“已全额退款” 和 部分退款，部分退款还需要正常记录
 ]
+# 2023/6/21 0:56	湖南高速服务区-退款	         湖南高速服务区	          湖南高速服务区	      收入	¥100.00	零钱	已全额退款
+# 2023/6/21 0:54	商户消费	                湖南高速服务区	         即时充电预付费	         支出	¥100.00	零钱	已全额退款
+# 2023/6/20 20:56	广东省交通开发有限公司-退款	 广东省交通开发有限公司	   广东省交通开发有限公司	收入	¥130.85	零钱	已退款￥130.85
+# 2023/6/20 20:28	商户消费	               广东省交通开发有限公司	  汽车充电服务	          支出	¥150.00	零钱	已退款(￥130.85)
+
 
 skip_transaction_res = [re.compile(key) for key in skip_transaction_map]
 

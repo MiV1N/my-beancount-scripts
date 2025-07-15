@@ -79,7 +79,10 @@ class Deduplicate:
 
     def skip_add_to_beancount(self, entry):
         """判断是否跳过添加到 beancount，当前仅判断是否包含银行资产账户。"""
-        return any("Assets:Bank" in posting.account for posting in entry.postings)
+        return any(
+            ("Assets:Bank" in posting.account) or ("CreditCard" in posting.account)
+            for posting in entry.postings
+        )
 
     def find_duplicate(self, entry, money, unique_no=None, replace_account='', currency='CNY'):
         if not self.entries or entry is None:

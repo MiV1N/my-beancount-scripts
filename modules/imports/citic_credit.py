@@ -38,8 +38,11 @@ def get_account_by_map(description):
 
 # 需要跳过的交易
 
-# 对于支付宝等线上交易，通过支付宝，微信拉取交易信息
-skip_transaction_map = []
+# 还款使用的中信储蓄卡，会在储蓄卡和信用卡中记录两笔，信用卡的还款记录就需要跳过
+skip_transaction_map = [
+    "中信银行移动银行",
+    "本行自动还款",
+]
 
 skip_transaction_res = [re.compile(key) for key in skip_transaction_map]
 
