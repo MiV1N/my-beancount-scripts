@@ -2,42 +2,13 @@ use std::io::Cursor;
 use std::{collections::HashMap, fmt, fs};
 // use std::io::{BufRead, BufReader, Read};
 use anyhow::{Context, Result as AnyhowResult};
+use calamine::{open_workbook_auto, RangeDeserializerBuilder, Reader};
 use csv;
+use csv::WriterBuilder;
+use log::debug;
 use log::{error, info, warn};
 use regex::Regex;
 use std::path::Path;
-// use calamine::{Reader, Xlsx, Xls, Range, Error as CalamineError, open_workbook };
-
-/// 检测并解码文件编码
-// trait Decoder {
-//     fn detect_and_decode(file: std::fs::File) -> Box<dyn Read> {
-//         let mut buffer = [0; 4096];
-//         let mut reader = BufReader::new(file.try_clone().unwrap());
-//         let bytes_read = reader.read(&mut buffer).unwrap_or(0);
-
-//         // 尝试 UTF-8 解码
-//         let (cow, _, had_errors) = UTF_8.decode_without_bom_handling_and_without_replacement(&buffer[0..bytes_read]);
-//         if !had_errors {
-//             return Box::new(file);
-//         }
-
-//         // 尝试 GBK 解码
-//         if let Some(gbk) = Encoding::for_label(b"gbk") {
-//             let (_, _, had_errors) = gbk.decode_without_bom_handling_and_without_replacement(&buffer[0..bytes_read]);
-//             if !had_errors {
-//                 return Box::new(encoding_rs_io::DecodeReaderBytes::new(file, gbk.new_decoder()));
-//             }
-//         }
-
-//         // 默认返回 UTF-8 读取器
-//         Box::new(file)
-//     }
-// }
-
-/// 定义一个迭代器 trait，用于统一不同文件类型的行读取接口
-// pub trait RowIterator {
-//     fn next_row(&mut self) -> AnyhowResult<HashMap<String, String>> ;
-// }
 
 /// CSV 文件读取器
 pub struct CsvReader {
@@ -97,42 +68,6 @@ impl Iterator for CsvReader {
     }
 }
 
-// pub struct BillFile{
-//     pub file_path: String,
-//     pub current_reader: Box<dyn RowIterator>,
-//     pub file_name: String,
-// }
-
-// impl BillFile {
-//     pub fn new(file_path: &str) -> Result<Self, std::io::Error> {
-//         let file_name = Path::new(file_path).file_name().unwrap().to_str().unwrap().to_string();
-//         //根据文件名称不同，创建不同的reader
-
-//         let Result::Ok(current_reader)  = Self::create_reader(file_path) else{
-//             return Err(std::io::Error::new(std::io::ErrorKind::Other, "不支持的文件类型"));
-//         };
-
-//         Ok(BillFile {
-//             file_path: file_path.to_string(),
-//             current_reader,
-//             file_name,
-//         })
-//     }
-
-//     /// 根据文件类型创建对应的读取器
-//     fn create_reader(file_path: &str) -> Result<Box<dyn RowIterator>, Box<dyn std::error::Error>> {
-//         let path = Path::new(file_path);
-//         if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
-//             match ext.to_lowercase().as_str() {
-//                 "csv" => Ok(Box::new(CsvReader::new(file_path)?)),
-//                 _ => Err(format!("不支持的文件类型: {}", ext).into()),
-//             }
-//         } else {
-//             Err("文件没有扩展名".into())
-//         }
-//     }
-// }
-
 // 定义一个类型别名，表示预处理器/处理器函数的类型
 type PreprocessorFunction = fn(&str) -> String;
 type ProcessorFunction = fn(&mut CsvReader) -> anyhow::Result<()>;
@@ -167,7 +102,7 @@ impl BillFiles {
     /// 创建一个新的 FileReader 实例，传入指定目录路径
     pub fn new(dir_path: &str) -> anyhow::Result<Self> {
         let mut file_paths = Vec::new();
-        collect_files(dir_path, &mut file_paths)?;
+        BillFiles::collect_files(dir_path, &mut file_paths)?;
 
         Ok(BillFiles {
             file_paths,
@@ -175,14 +110,79 @@ impl BillFiles {
         })
     }
 
+    /// 递归收集指定目录下的所有csv、xls、xlsx文件
+    fn collect_files(dir_path: &str, file_paths: &mut Vec<String>) -> Result<(), std::io::Error> {
+        let entries = fs::read_dir(dir_path)?;
+        for entry in entries {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                BillFiles::collect_files(path.to_str().unwrap(), file_paths)?;
+            } else {
+                if let Some(ext) = path.extension() {
+                    // if ext == "csv" {
+                    if ext == "csv" || ext == "xls" || ext == "xlsx" {
+                        file_paths.push(path.to_str().unwrap().to_string());
+                    }
+                }
+            }
+        }
+        // 将包含“中信”或“CMB”名称的文件放到列表最前面
+
+        file_paths.sort_by_key(|file_path| {
+            let file_name: String = file_path.to_lowercase();
+            if file_name.contains("中信")
+                || file_name.contains("cmb")
+                || file_name.contains("citic")
+            {
+                0
+            } else {
+                1
+            }
+        });
+
+        Ok(())
+    }
+
     pub fn regist_processor(&mut self, rule: BillProcessRules) -> anyhow::Result<()> {
         self.process_rules.push(rule);
         Ok(())
     }
 
-    fn excel_to_csv_string(file_path: &str) -> String {
-        info!("excel_to_csv_string: {}", file_path);
-        "a,b,c\n1,2,3\n".to_string()
+    pub fn excel_to_csv_string(excel_path: &str) -> anyhow::Result<String> {
+        // info!("excel_to_csv_string: {}", file_path);
+        // "a,b,c\n1,2,3\n".to_string()
+        // 尝试打开 Excel 文件，calamine 会自动检测文件类型
+        let mut workbook = open_workbook_auto(excel_path)?;
+
+        let sheet_names = workbook.sheet_names();
+        let sheet_name = sheet_names.first().unwrap();
+
+        // 获取第一个工作表的范围
+        let range = workbook
+            .worksheet_range(sheet_name)
+            .expect(format!("无法获取工作表 '{}' 的范围", sheet_name).as_str());
+
+        // 创建一个内存中的 CSV 写入器
+        let mut writer = WriterBuilder::new()
+            .has_headers(true) // 如果你的 Excel 文件第一行是标题，这里可以设置为 true
+            .from_writer(vec![]); // 写入到 Vec<u8> 中
+
+        // 遍历 Excel 范围中的每一行
+        for row in range.rows() {
+            let mut record: Vec<String> = Vec::new();
+            for cell in row {
+                // 将每个单元格的值转换为字符串
+                record.push(format!("{}", cell).trim().to_string());
+            }
+            writer.write_record(&record)?; // 写入 CSV 记录
+        }
+
+        // 将 Vec<u8> 转换为 String
+        let csv_bytes = writer.into_inner()?;
+        let csv_string = String::from_utf8(csv_bytes)?;
+
+        Ok(csv_string)
     }
 
     pub fn process(&self) -> anyhow::Result<()> {
@@ -201,15 +201,13 @@ impl BillFiles {
                             }
                             "xls" => {
                                 info!("xls file: {}", file_path);
-                                continue;
+                                content = Self::excel_to_csv_string(file_path)?;
                             }
                             "xlsx" => {
                                 info!("xlsx file: {}", file_path);
-                                continue;
                             }
                             _ => {
                                 warn!("unsupported file type: {}", ext);
-                                continue;
                             }
                         }
                     }
@@ -241,37 +239,37 @@ impl BillFiles {
     }
 }
 
-/// 递归收集指定目录下的所有csv、xls、xlsx文件
-fn collect_files(dir_path: &str, file_paths: &mut Vec<String>) -> Result<(), std::io::Error> {
-    let entries = fs::read_dir(dir_path)?;
-    for entry in entries {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_dir() {
-            collect_files(path.to_str().unwrap(), file_paths)?;
-        } else {
-            if let Some(ext) = path.extension() {
-                if ext == "csv" {
-                    // if ext == "csv" || ext == "xls" || ext == "xlsx" {
-                    file_paths.push(path.to_str().unwrap().to_string());
-                }
-            }
-        }
-    }
-    // 将包含“中信”或“CMB”名称的文件放到列表最前面
+// /// 递归收集指定目录下的所有csv、xls、xlsx文件
+// fn collect_files(dir_path: &str, file_paths: &mut Vec<String>) -> Result<(), std::io::Error> {
+//     let entries = fs::read_dir(dir_path)?;
+//     for entry in entries {
+//         let entry = entry?;
+//         let path = entry.path();
+//         if path.is_dir() {
+//             collect_files(path.to_str().unwrap(), file_paths)?;
+//         } else {
+//             if let Some(ext) = path.extension() {
+//                 if ext == "csv" {
+//                     // if ext == "csv" || ext == "xls" || ext == "xlsx" {
+//                     file_paths.push(path.to_str().unwrap().to_string());
+//                 }
+//             }
+//         }
+//     }
+//     // 将包含“中信”或“CMB”名称的文件放到列表最前面
 
-    file_paths.sort_by_key(|file_path| {
-        let file_name: String = file_path.to_lowercase();
-        if file_name.contains("中信") || file_name.contains("cmb") || file_name.contains("citic")
-        {
-            0
-        } else {
-            1
-        }
-    });
+//     file_paths.sort_by_key(|file_path| {
+//         let file_name: String = file_path.to_lowercase();
+//         if file_name.contains("中信") || file_name.contains("cmb") || file_name.contains("citic")
+//         {
+//             0
+//         } else {
+//             1
+//         }
+//     });
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 #[cfg(test)]
 mod tests {
@@ -283,7 +281,7 @@ mod tests {
     fn test_collect_files() {
         let mut file_paths = Vec::new();
         // 使用测试数据目录
-        collect_files("test_datas", &mut file_paths).expect("Failed to collect files");
+        BillFiles::collect_files("test_datas", &mut file_paths).expect("Failed to collect files");
         assert!(!file_paths.is_empty(), "No files collected");
 
         // 验证收集到CSV和Excel文件
