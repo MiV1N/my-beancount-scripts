@@ -1,0 +1,3 @@
+[workspace]
+members = ["beancount-core", "beancount-parser", "beancount-render","beancount-importer"]
+resolver = "2"

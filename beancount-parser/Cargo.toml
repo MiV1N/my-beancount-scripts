@@ -1,0 +1,19 @@
+[package]
+name = "beancount-parser"
+description = "Parser for the input data format of Beancount, a text-based double-entry bookkeeping system."
+version = "0.2.0"
+authors = ["Tyler Wilcock <tyler.l.wilcock@gmail.com>", "Michael Budde <git@mbudde.dk>"]
+repository = "https://github.com/twilco/beancount/tree/master/beancount-parser"
+license = "MIT/Apache-2.0"
+edition = "2021"
+
+[badges]
+travis-ci = { repository = "twilco/beancount", branch = "master" }
+
+[dependencies]
+beancount-core = { version = "0.2", path = "../beancount-core" }
+pest = "2.4"
+pest_derive = "2"
+indoc = "1"
+rust_decimal = "1"
+lazy_static = "1"
