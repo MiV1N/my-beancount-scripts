@@ -37,7 +37,7 @@ class Alipay(Base):
 
     def __init__(self, filename, byte_content, entries, option_map):
 
-        if not re.search(r'[alipay_record_|支付宝交易明细].*\.csv$', filename.name):
+        if not re.search(r'(alipay_record_|支付宝交易明细).*\.csv$', filename.name):
             raise Exception("not alipay ,skip")
 
         content = byte_content.decode('gbk')
@@ -104,6 +104,14 @@ class Alipay(Base):
                     pbar.update(1)
                     continue
     
+                # 跳过 不计收支 并且 是退款成功的交易
+                # 交易时间	交易分类	交易对方	对方账号	商品说明	收/支	金额	收/付款方式	交易状态	交易订单号	商家订单号	备注
+                # 2025/7/18 23:40	充值缴费	浙江天猫技术有限公司	she***@service.aliyun.com	淘宝省钱卡	不计收支	9.9		交易关闭	"2025071822001310301401773053	"	"T3901P4639035205911913834	"	
+                # 2025/7/18 14:16	退款	x***8	135******20	退款-【自动发货】汽水音乐VIP会员月卡  汽水音乐官方直冲秒到	不计收支	0.1	余额宝	退款成功	"2025071822001110301401375979_4638152664111913834	"	"T200P4638152664111913834	"	
+                # 2025/7/18 14:10	日用百货	x***8	135******20	【自动发货】汽水音乐VIP会员月卡  汽水音乐官方直冲秒到	支出	0.1	余额宝	交易关闭	"2025071822001110301401375979	"	"T200P4638152664111913834	"	
+                if (row['收/支'] != '') and (row['收/支'] in ('不计收支')) and ("退款成功" in row['商品状态']):
+                    pbar.update(1)
+                    continue
 
                 if (row['收/付款方式'] != '') and (row['收/付款方式'] in ('工商银行储蓄卡(6614)')):  #工商银行基本上不储蓄，不添加到记账中
                     pbar.update(1)

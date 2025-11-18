@@ -50,7 +50,7 @@ descriptions = {
     '服饰':'Expenses:Clothing',
 
     # ; 食物子分类
-    '餐饮美食|面|下午茶|蛋糕|食品|饼|小炒|吐司|干锅|早餐|盒马|酱香饼|餐饮|点餐|美团|海底捞|灶东家|餐厅|每味每客|莱得快|乡村基|生鲜|果蔬': 'Expenses:Food',  #
+    '餐饮美食|面|下午茶|蛋糕|食品|饼|小炒|吐司|干锅|肯德基|早餐|盒马|酱香饼|餐饮|点餐|美团|海底捞|灶东家|餐厅|每味每客|莱得快|乡村基|生鲜|果蔬': 'Expenses:Food',  #
     '果仓|果之缘':'Expenses:Food:Snacks',
     '饮品|咖啡|coffee|Coffee|霸王茶姬|贩卖机':"Expenses:Food:Beverages",
 
@@ -63,10 +63,10 @@ descriptions = {
 
     # ; 交通子分类
     '城市通卡|出行|渡口|打车|中交|T3': 'Expenses:Transportation:PublicTransportation',
-    '爱车养车|停车|南网电动|深圳交警|太平财产保险有限公司|石油|特斯拉': 'Expenses:Transportation:Car',
+    '爱车养车|临停|停车|南网电动|深圳交警|太平财产保险有限公司|石油|特斯拉': 'Expenses:Transportation:Car',
 
     # ; 用
-    '日用百货|纯水机|超市|便利|无印良品|怪兽充电|罗森|美容美发': 'Expenses:Household',
+    '日用百货|纯水机|超市|沃尔玛|便利|无印良品|怪兽充电|罗森|美容美发': 'Expenses:Household',
 
 
     # ; 通讯子分类

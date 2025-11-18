@@ -65,15 +65,19 @@ class CMB(Base):
         start_lines = 0
         end_lines = 0
         for idx,line in enumerate(lines):
-            if line.startswith("交易日期"):
+            if line.startswith("\"交易日期") or line.startswith("交易日期"):
                 start_lines = idx
             
-            if (not line.startswith("#")) and (line != '') and (line != '\r'):
+            if (line.startswith("#") or line.startswith("\"#")) or \
+                (line == '' or line =="\"\"") or \
+                (line.startswith('\r') or line.startswith('\n')):
+                pass
+            else:
                 end_lines = idx
             
 
         # print('Import CMB: ' + lines[0])
-        content = "\n".join(lines[start_lines:end_lines+1])
+        content = "\n".join(lines[start_lines:end_lines])
         # logging.error(f"{lines[end_lines+1]}")
         self.content = content
         self.line_num = end_lines - start_lines
