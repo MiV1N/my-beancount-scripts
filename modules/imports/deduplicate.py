@@ -63,8 +63,8 @@ from ..accounts import public_accounts
 # SELECT ANY_META("filename"), ANY_META("lineno") FROM YEAR = 2023 时：
 class AccountType(IntEnum):
     NONE = 1
-    UNKNOWN = 2
-    FAMILY_PAYMENT = 3
+    UNKNOWN = 2         # 未知账户
+    FAMILY_PAYMENT = 3  # 亲情付
     OTHER = 4           # 消费账户
     MOBILEPAYMENT = 5   # 资产
     BANK = 6            # 资产
@@ -133,7 +133,7 @@ class Deduplicate:
             # 如果已导入的条目和待导入的条目都有时间戳，但时间间隔>tolerance，认为是不同交易
 
             # 2. 时间戳容差判断
-            tolerance = 70  # 秒, 支付宝的账单时间只到分钟，所以这里的容差最小都要是60s
+            tolerance = 30  # 秒, 注意:支付宝的账单时间是到秒的，但是由于excel时间格式的原因只显示到分钟
             if 'timestamp' in entry.meta and _timestamp not in ('None', ''):
                 try:
                     time_gap = abs(int(_timestamp) - int(entry.meta['timestamp'])) # 单位:秒
@@ -154,10 +154,10 @@ class Deduplicate:
         _flag, _timestamp, _metas, _entry = be_modify_row
         _postings = _entry.postings
 
-        # 合并 meta 信息
+        # 合并 meta 信息，比如 note，时间戳，订单等
         self._merge_meta(_metas, entry.meta)
 
-        # 合并 postings
+        # 合并 postings 账户信息
         if self._need_postings_merge(_postings, _entry.narration):
             merged_postings = self.postings_merge(list(_postings) + list(entry.postings))
             _postings.clear()
@@ -224,7 +224,7 @@ class Deduplicate:
                 elif value != target_meta[key]:
                     target_meta[key] += str(value)
 
-    def _need_postings_merge(self, postings, narration):
+    def  _need_postings_merge(self, postings, narration):
         """判断是否需要合并 postings（存在 Unknown 或亲情卡）"""
         return any(
             ("Unknown" in post.account) or

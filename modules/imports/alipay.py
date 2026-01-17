@@ -19,7 +19,7 @@ Account支付宝 = 'Assets:MobilePayment:Alipay'
 
 account_map = {
     "招商":"Assets:Bank:CMB:3007",
-    "中信银行储蓄卡(5999)":"Assets:Bank:CITIC:3007",
+    "中信银行储蓄卡\(5999\)":"Assets:Bank:CITIC:5999",
 }
 
 account_map_res = dict([(key, re.compile(key)) for key in account_map])
@@ -114,7 +114,9 @@ class Alipay(Base):
                     pbar.update(1)
                     continue
 
-                if (row['收/付款方式'] != '') and (row['收/付款方式'] in ('工商银行储蓄卡(6614)')):  #工商银行基本上不储蓄，不添加到记账中
+                # 跳过指定的收/付款方式（只要包含任一关键字就跳过）
+                skip_keywords = ['工商银行储蓄卡(6614)']
+                if (row['收/付款方式'] != '') and any(keyword in row['收/付款方式'] for keyword in skip_keywords):
                     pbar.update(1)
                     continue
 
@@ -159,7 +161,7 @@ class Alipay(Base):
                     )
 
 
-                account2 = get_account_by_map(row['收/付款方式'])
+                real_account = get_account_by_map(row['收/付款方式'])
 
                 #收入
                 if self.is_income(row) :
@@ -169,19 +171,19 @@ class Alipay(Base):
 
                     price = row['金额']
                     # 金额为正，写入到支付宝的账户中
-                    data.create_simple_posting(entry, account2, price,'CNY')
+                    data.create_simple_posting(entry, real_account, price,'CNY')
                     data.create_simple_posting(entry, income, f"-{price}", 'CNY')
                     
                 else:
-                    account = get_account_by_guess(row['交易对方'], description, time)
-                    if account == "Expenses:Unknown":
+                    out_account = get_account_by_guess(row['交易对方'], description, time)
+                    if out_account == "Expenses:Unknown":
                         entry = entry._replace(flag='!')
 
                     price = row['金额']
 
                     # 金额为正，写入到支出的账户中
-                    data.create_simple_posting(entry, account, price, 'CNY')
-                    data.create_simple_posting(entry, account2, f"-{price}",'CNY')
+                    data.create_simple_posting(entry, out_account, price, 'CNY')
+                    data.create_simple_posting(entry, real_account, f"-{price}",'CNY')
 
 
                 
