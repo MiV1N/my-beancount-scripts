@@ -149,7 +149,7 @@ class WeChat(Base):
 
                 # 银行账户，支出/收入都会是银行的账户
                 account2 = get_account_by_map(row['支付方式'])
-                price = row['金额(元)'].strip("¥")
+                price = row['金额(元)'].strip("¥").replace(",", "")
 
                 #支出
                 if row['收/支'] in ('支出'):
@@ -170,10 +170,23 @@ class WeChat(Base):
                     # 金额为正，写入到微信的账户中
                     data.create_simple_posting(entry, account2, price,'CNY')
                     data.create_simple_posting(entry, income, f"-{price}", 'CNY')
+                
+                elif row['交易类型'] in ('零钱提现'):
+                    # 提取体现目的地账户
+                    account = get_account_by_guess(counterparty, description, amount_datetime)
+                    if account == "Expenses:Unknown":
+                        entry = entry._replace(flag='!')
+                    # 提取手续费用
+                    fee = row['备注'].strip("服务费¥").strip("\t")
+
+                    # 记录
+                    data.create_simple_posting(entry, account, float(price) - float(fee),'CNY')
+                    data.create_simple_posting(entry, "Expenses:Miscellaneous:Fee", fee, 'CNY')
+                    data.create_simple_posting(entry, account2, f"-{price}", 'CNY')
 
                 else:
                     print("非收入/支出")
-                    pass
+                    exit()
 
             
                 #去重
