@@ -160,7 +160,6 @@ class CMB(Base):
                     )
 
                 # 银行账户，支出/收入都会是银行的账户
-                account2 = Account招商
 
                 amount_out  = True if row["支出"] != "" else False
                 price = row['支出'] if amount_out else row['收入']
@@ -172,7 +171,7 @@ class CMB(Base):
                         entry = entry._replace(flag='!')
 
                     # 支出，金额写到Expenses账户
-                    data.create_simple_posting(entry, account2, f"-{price}",'CNY')
+                    data.create_simple_posting(entry, Account招商, f"-{price}",'CNY')
                     data.create_simple_posting(entry, account, price, 'CNY')
 
                 #收入
@@ -183,7 +182,7 @@ class CMB(Base):
 
                     # 收入，金额写到收入账户
                     data.create_simple_posting(entry, income, f"-{price}", 'CNY')
-                    data.create_simple_posting(entry, account2, price,'CNY')
+                    data.create_simple_posting(entry, Account招商, price,'CNY')
 
                 #银行账单不去重
                 amount = float(price)

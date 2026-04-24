@@ -19,11 +19,11 @@ from tqdm import tqdm
 
 Account_WeChat = 'Assets:MobilePayment:WeChat'
 
-account_map = {
-    "招商银行\(3007\)":"Assets:Bank:CMB:3007",
+account_map = { 
+    "招商银行.*\(3007\)":"Assets:Bank:CMB:3007", #招商银行储蓄卡(3007)
     "中信银行信用卡\(3995\)":"Liabilities:CreditCard:CITIC:3995",
     "中信银行储蓄卡\(5999\)":"Assets:Bank:CITIC:5999",
-    "中信银行\(5999\)":"Assets:Bank:CITIC:5999"
+    "中信银行.*\(5999\)":"Assets:Bank:CITIC:5999"
 }
 
 account_map_res = dict([(key, re.compile(key)) for key in account_map])
@@ -148,51 +148,63 @@ class WeChat(Base):
                     )
 
                 # 银行账户，支出/收入都会是银行的账户
-                account2 = get_account_by_map(row['支付方式'])
+                wechat_binding_card = get_account_by_map(row['支付方式'])
                 price = row['金额(元)'].strip("¥").replace(",", "")
+                entries = []
 
                 #支出
                 if row['收/支'] in ('支出'):
                     account = get_account_by_guess(counterparty, description, amount_datetime)
                     if account == "Expenses:Unknown":
                         entry = entry._replace(flag='!')
-
-                    # 金额为正，写入到支出的账户中
                     data.create_simple_posting(entry, account, price, 'CNY')
-                    data.create_simple_posting(entry, account2, f"-{price}",'CNY')
+                    data.create_simple_posting(entry, wechat_binding_card, f"-{price}",'CNY')
+                    entries.append(entry)
 
                 #收入
                 elif row['收/支'] in ('收入'):
                     income = get_income_account_by_guess(counterparty, description, amount_datetime)
                     if income == 'Income:Unknown':
                         entry = entry._replace(flag='!')
-
-                    # 金额为正，写入到微信的账户中
-                    data.create_simple_posting(entry, account2, price,'CNY')
+                    data.create_simple_posting(entry, wechat_binding_card, price,'CNY')
                     data.create_simple_posting(entry, income, f"-{price}", 'CNY')
-                
-                elif row['交易类型'] in ('零钱提现'):
-                    # 提取体现目的地账户
-                    account = get_account_by_guess(counterparty, description, amount_datetime)
-                    if account == "Expenses:Unknown":
-                        entry = entry._replace(flag='!')
-                    # 提取手续费用
-                    fee = row['备注'].strip("服务费¥").strip("\t")
+                    entries.append(entry)
 
-                    # 记录
-                    data.create_simple_posting(entry, account, float(price) - float(fee),'CNY')
-                    data.create_simple_posting(entry, "Expenses:Miscellaneous:Fee", fee, 'CNY')
-                    data.create_simple_posting(entry, account2, f"-{price}", 'CNY')
+                elif row['交易类型'] in ('零钱提现'):
+                    fee_str = row['备注'].strip("服务费¥").strip("\t")
+                    try:
+                        fee = float(fee_str)
+                    except ValueError:
+                        fee = 0.0
+                    withdraw_amount = float(price) - fee
+
+                    entry_withdraw = entry
+                    data.create_simple_posting(entry_withdraw, wechat_binding_card, str(withdraw_amount), 'CNY')
+                    data.create_simple_posting(entry_withdraw, Account_WeChat, f"-{withdraw_amount}", 'CNY')
+                    entries.append(entry_withdraw)
+
+                    if fee > 0:
+                        entry_fee = Transaction(
+                            meta,
+                            date(amount_datetime.year, amount_datetime.month, amount_datetime.day),
+                            "*",
+                            row['交易对方'],
+                            f"{description}(手续费)",
+                            data.EMPTY_SET,
+                            data.EMPTY_SET, []
+                        )
+                        data.create_simple_posting(entry_fee, "Expenses:Miscellaneous:Fee", str(fee), 'CNY')
+                        data.create_simple_posting(entry_fee, Account_WeChat, f"-{fee}", 'CNY')
+                        entries.append(entry_fee)
 
                 else:
                     print("非收入/支出")
                     exit()
 
-            
-                #去重
                 amount = float(price)
-                if not self.deduplicate.find_duplicate(entry, amount,"wechat_trade_no"):
-                    transactions.append(entry)
+                for e in entries:
+                    if not self.deduplicate.find_duplicate(e, amount, "wechat_trade_no"):
+                        transactions.append(e)
                 pbar.update(1)
         # self.deduplicate.apply_beans()
         return transactions

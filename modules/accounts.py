@@ -116,6 +116,7 @@ descriptions = {
     '朝朝宝':'Assets:Investments:朝朝宝',
     '购买零钱+':'Assets:Investments:CITIC:零钱plus',
     '中信.*信用卡还款':'Liabilities:CreditCard:CITIC:3995',
+    '招商银行.*3007':'Assets:Bank:CMB:3007',
 
     # 新增支付平台
     '（特约）拼多多|拼多多平台商户|先用后付.*拼多多': 'Expenses:Miscellaneous:Unknown',
@@ -181,8 +182,9 @@ incomes = {
     '华智跟投':"Assets:Investments:UNISINSIGHT",
     '朝朝宝':'Assets:Investments:朝朝宝',
     '雪球基金|基金申购':"Assets:Investments:雪球基金",
-    '零钱+':'Assets:Investments:CITIC:零钱plus',
+    '零钱\+':'Assets:Investments:CITIC:零钱plus',
     '中信.*信用卡还款':'Liabilities:CreditCard:CITIC:3995',
+    '微信零钱提现':'Assets:MobilePayment:WeChat',
 
     # 无法分类
     '群收款|微信转账':'Income:Miscellaneous:Unknown', #无法分类
